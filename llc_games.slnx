@@ -3,5 +3,20 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="llc_games/llc_games.vcxproj" />
+  <Project Path="../llc/llc/llc.vcxproj" />
+  <Project Path="../llc/llc_test_core/llc_test_core.vcxproj">
+    <BuildDependency Project="../llc/llc/llc.vcxproj" />
+    <BuildDependency Project="../llc/llc_test_module/llc_test_module.vcxproj" />
+    <BuildDependency Project="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" />
+  </Project>
+  <Project Path="../llc/llc_test_module/llc_test_module.vcxproj">
+    <BuildDependency Project="../llc/llc/llc.vcxproj" />
+    <BuildDependency Project="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" />
+  </Project>
+  <Project Path="../llc_engine/llc_engine/llc_engine.vcxproj" />
+  <Project Path="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" />
+  <Project Path="llc_games/llc_games.vcxproj">
+    <BuildDependency Project="../llc/llc/llc.vcxproj" />
+    <BuildDependency Project="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" />
+  </Project>
 </Solution>
