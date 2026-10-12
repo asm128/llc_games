@@ -1,0 +1,13 @@
+.vs/
+.vscode/
+obj/
+x64/
+Win32/
+obj/
+x64.Debug/
+x64.Release/
+Win32.Debug/ 
+Win32.Release/
+Debug/ 
+Release/
+codex_build/
