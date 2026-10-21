@@ -3,20 +3,29 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="../llc/llc/llc.vcxproj" />
-  <Project Path="../llc/llc_test_core/llc_test_core.vcxproj">
+  <Project Path="../llc/llc/llc.vcxproj" Id="830ab681-b788-47d4-9767-ba4e0792f682" />
+  <Project Path="../llc/llc_test_core/llc_test_core.vcxproj" Id="6ac63b34-f2af-481d-9f2f-d7336a272638">
     <BuildDependency Project="../llc/llc/llc.vcxproj" />
     <BuildDependency Project="../llc/llc_test_module/llc_test_module.vcxproj" />
     <BuildDependency Project="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" />
   </Project>
-  <Project Path="../llc/llc_test_module/llc_test_module.vcxproj">
+  <Project Path="../llc/llc_test_module/llc_test_module.vcxproj" Id="d0cda2a4-f7af-4cbb-a43b-4b92d37e3e10">
     <BuildDependency Project="../llc/llc/llc.vcxproj" />
     <BuildDependency Project="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" />
   </Project>
-  <Project Path="../llc_engine/llc_engine/llc_engine.vcxproj" />
-  <Project Path="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" />
-  <Project Path="llc_games/llc_games.vcxproj">
+  <Project Path="../llc/llc_engine/llc_engine.vcxproj" Id="b29f5da4-47fd-496d-be49-9ff25ad28c00" />
+  <Project Path="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" Id="8fd826f8-3739-44e6-8cc8-997122e53b8d" />
+  <Project Path="llc_games/llc_games.vcxproj" Id="b33a66ba-1154-405f-8066-07c9048c5bec">
     <BuildDependency Project="../llc/llc/llc.vcxproj" />
     <BuildDependency Project="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" />
+  </Project>
+  <Project Path="galaxy_hell/galaxy_hell.vcxproj" Id="6bcc32c5-95c9-4d90-8cb9-e29b2da2bfc2">
+    <BuildDependency Project="../llc/llc/llc.vcxproj" />
+    <BuildDependency Project="../llc/llc_engine/llc_engine.vcxproj" />
+    <BuildDependency Project="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" />
+  </Project>
+  <Project Path="galaxy_hell_win32/galaxy_hell_win32.vcxproj" Id="0716fffd-c2c0-4b75-bc84-ccf18c2a1c5e">
+    <BuildDependency Project="galaxy_hell/galaxy_hell.vcxproj" />
+    <BuildDependency Project="../llc/llc_engine/llc_engine.vcxproj" />
   </Project>
 </Solution>

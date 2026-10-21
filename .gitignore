@@ -11,3 +11,4 @@ Win32.Release/
 Debug/ 
 Release/
 codex_build/
+packages/
