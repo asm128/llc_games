@@ -428,12 +428,12 @@ static	::llc::error_t	drawShots			(::llc::g8bgra targetPixels
 	, ::ghg::SGalaxyHellDrawCache		& drawCache
 	) {
 	uint32_t												pixelsDrawn				= 0;
-	const ::llc::au2_t						& entityChildren		= shipState.EntitySystem.EntityChildren[iPartEntity];
+	const ::llc::vceid						  entityChildren		= shipState.Engine.Entities.GetChildren(iPartEntity);
 	double													absanim					= fabsf(sinf(animationTime * 3));
 	const ::llc::rgbaf								shadedColor				= (absanim < .5) ? ::llc::rgbaf{} : shipColor * (absanim * .5);
 	for(uint32_t iEntity = 0; iEntity < entityChildren.size(); ++iEntity) {
-		const ::ghg::SGHEntity									& entityChild				= shipState.EntitySystem.Entities[entityChildren[iEntity]];
-		if(-1 == entityChild.Parent)
+		const ::ghg::SGHEntityVisual									& entityChild				= shipState.EntityVisuals[entityChildren[iEntity]];
+		if(::llc::EID_INVALID == shipState.Engine.Entities[entityChildren[iEntity]].Parent)
 			continue;
 		if(-1 == entityChild.Geometry)
 			continue;
@@ -484,7 +484,7 @@ static	::llc::error_t	drawShip
 	if(iShip >= (int32_t)solarSystem.PlayState.Constants.Players || shipCore.Team)
 		return 0;
 
-	const ::ghg::SGHEntity				& entity			= solarSystem.ShipState.EntitySystem.Entities[solarSystem.ShipState.ShipCoreEntity[iShip]];
+	const ::ghg::SGHEntityVisual				& entity			= solarSystem.ShipState.EntityVisuals[solarSystem.ShipState.ShipCoreEntity[iShip]];
 	const ::llc::m4f2_t					& matrixTransform	= solarSystem.ShipState.Scene.Transforms[entity.Transform];
 	::llc::n3f2_t						starPos				= matrixTransform.GetTranslation() + ::llc::n3f2_t{0.0f, 8.0f, 0.0f};
 	starPos							= matrixVP.Transform(starPos);

@@ -531,7 +531,7 @@ static	::llc::error_t	uiPlayerUpdatePlay	(::ghg::SUIPlayer & uiPlayer, uint32_t 
 		{ // Update ship part render and health bar
 			::llc::m4f2_t				matrixView		= {};
 			::llc::SCameraPoints		& camera		= viewport.Camera;
-			camera.Target			= game.ShipState.Scene.Transforms[game.ShipState.EntitySystem.Entities[game.ShipState.ShipPartEntity[iOrbiter] + 1].Transform].GetTranslation();
+			camera.Target			= game.ShipState.Scene.Transforms[game.ShipState.EntityVisuals[game.ShipState.GetShipPartEntity(iOrbiter)].Transform].GetTranslation();
 			camera.Position			= camera.Target;
 			camera.Position.y		+= 7; //-= 20;
 			stacxpr	::llc::n3f2_t		cameraUp		= {1, 0, 0};

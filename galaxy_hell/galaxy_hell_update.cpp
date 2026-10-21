@@ -52,7 +52,7 @@ static	::llc::error_t	handleCollisionPoint		(::ghg::SGalaxyHell & solarSystem, i
 		solarSystem.DecoState.ScoreParticles.Create(collisionPoint, bounceVector, 10.0f + weaponDamage * .001f, {weaponDamage * 10, 2});
 		attackerScore.KilledOrbiters	+= 1;
 		damagedScore.OrbitersLost		+= 1;
-		const ::ghg::SGHEntity		& entityGeometry			= solarSystem.ShipState.EntitySystem.Entities[solarSystem.ShipState.ShipPartEntity[iAttackedPart] + 1];
+		const ::ghg::SGHEntityVisual		& entityGeometry			= solarSystem.ShipState.EntityVisuals[solarSystem.ShipState.GetShipPartEntity(iAttackedPart)];
 		const int32_t				indexMesh					= entityGeometry.Geometry;
 		const uint32_t				countTriangles				= solarSystem.ShipState.Scene.Geometry[indexMesh].Triangles.size();
 		::ghg::decoExplosionAdd(solarSystem.DecoState.Explosions, indexMesh, entityGeometry.Image, countTriangles, collisionPoint, 60);
@@ -76,29 +76,28 @@ static	::llc::error_t	handleCollisionPoint		(::ghg::SGalaxyHell & solarSystem, i
 	return 0;
 }
 
-static	::llc::error_t	updateEntityTransforms		(uint32_t iEntity, const ::llc::view<const ::ghg::SGHEntity> & entities, const ::llc::view<const ::llc::au2_t> & entitiesChildren, ::ghg::SShipScene & scene, ::llc::SRigidBodyIntegrator & bodies)	{
-	const ::ghg::SGHEntity		& entity					= entities[iEntity];
-	if(-1 == entity.Body) {
-		if(-1 == entity.Parent)
+static	::llc::error_t	updateEntityTransforms		(uint32_t iEntity, const ::llc::SVirtualEntityManager & entities, ::ghg::SShipScene & scene, ::llc::SRigidBodyIntegrator & bodies)	{
+	const ::llc::SEntity			& entity					= entities[iEntity];
+	if(::llc::EID_INVALID == entity.RigidBody) {
+		if(::llc::EID_INVALID == entity.Parent)
 			scene.Transforms[iEntity].Identity();
 		else
 			scene.Transforms[iEntity]	= scene.Transforms[entity.Parent];
 	}
 	else {
 		::llc::m4f2_t				& matrixGlobal				= scene.Transforms[iEntity];
-		bodies.GetTransform(entity.Body, matrixGlobal);
-		if(-1 != entity.Parent)
+		bodies.GetTransform(entity.RigidBody, matrixGlobal);
+		if(::llc::EID_INVALID != entity.Parent)
 			matrixGlobal			*= scene.Transforms[entity.Parent];
 	}
 
-	const ::llc::au2_t			& entityChildren			= entitiesChildren[iEntity];
+	const ::llc::vceid			entityChildren				= entities.GetChildren(iEntity);
 	for(uint32_t iChild = 0; iChild < entityChildren.size(); ++iChild) {
 		const uint32_t				iChildEntity				= entityChildren[iChild];
-		::updateEntityTransforms(iChildEntity, entities, entitiesChildren, scene, bodies);
+		::updateEntityTransforms(iChildEntity, entities, scene, bodies);
 	}
 	return 0;
 }
-
 static	::llc::error_t	updateShots				(::ghg::SGalaxyHell & solarSystem, double secondsLastFrame)	{
 	for(uint32_t iShip = 0; iShip < solarSystem.ShipState.SpaceshipManager.ShipCores.size(); ++iShip) {
 		::llc::au1_t					& shipParts				= solarSystem.ShipState.SpaceshipManager.ShipParts[iShip];
@@ -133,7 +132,7 @@ static	::llc::error_t	updateShots				(::ghg::SGalaxyHell & solarSystem, double s
 					if(shipPartAttacked.Health.Value <= 0)
 						continue;
 					const int32_t				iAttackedPartEntity		= solarSystem.ShipState.ShipPartEntity[attackedPart];
-					const ::ghg::SGHEntity		& entity				= solarSystem.ShipState.EntitySystem.Entities[iAttackedPartEntity];
+					const ::ghg::SGHEntityVisual		& entity				= solarSystem.ShipState.EntityVisuals[iAttackedPartEntity];
 					if(-1 != entity.Geometry) {
 						const ::llc::n3f2_t			attackedPosition		= solarSystem.ShipState.Scene.Transforms[iAttackedPartEntity].GetTranslation();
 						::std::lock_guard			lockUpdate				(solarSystem.LockUpdate);
@@ -142,10 +141,10 @@ static	::llc::error_t	updateShots				(::ghg::SGalaxyHell & solarSystem, double s
 							if(::handleCollisionPoint(solarSystem, weaponAttacker.Shot.Damage, shipAttackerScore, shipAttackedScore, shipPartAttacked, attackedPart, shipAttacked, iShipAttacked, attackedPosition, collisionPoints[iCollisionPoint]))	// returns true if part health reaches zero.
 								break;
 					}
-					const ::llc::au2_t			& entityChildren		= solarSystem.ShipState.EntitySystem.EntityChildren[iAttackedPartEntity];
+					const ::llc::vceid			  entityChildren		= solarSystem.ShipState.Engine.Entities.GetChildren(iAttackedPartEntity);
 					for(uint32_t iEntity = 0; iEntity < entityChildren.size(); ++iEntity) {
-						::ghg::SGHEntity			& entityChild			= solarSystem.ShipState.EntitySystem.Entities[entityChildren[iEntity]];
-						if(-1 == entityChild.Parent)
+						::ghg::SGHEntityVisual			& entityChild			= solarSystem.ShipState.EntityVisuals[entityChildren[iEntity]];
+						if(::llc::EID_INVALID == solarSystem.ShipState.Engine.Entities[entityChildren[iEntity]].Parent)
 							continue;
 
 						if(-1 == entityChild.Geometry)
@@ -262,7 +261,7 @@ static	::llc::error_t	updateShipOrbiter			(::ghg::SGalaxyHell & solarSystem, int
 		solarSystem.ShipState.SpaceshipManager.ShipScores[iShip].Shots	+= 1;
 		solarSystem.ShipState.SpaceshipManager.ShipScores[iShip].Bullets	+= weapon.Shot.ParticleCount;
 
-		const ::llc::m4f2_t			& shipModuleMatrix			= solarSystem.ShipState.Scene.Transforms[solarSystem.ShipState.EntitySystem.Entities[solarSystem.ShipState.ShipPartEntity[iShipPart] + 1].Transform];
+		const ::llc::m4f2_t			& shipModuleMatrix			= solarSystem.ShipState.Scene.Transforms[solarSystem.ShipState.EntityVisuals[solarSystem.ShipState.GetShipPartEntity(iShipPart)].Transform];
 		::llc::n3f2_t				positionGlobal				= shipModuleMatrix.GetTranslation();
 		::llc::n3f2_t				targetDistance				= (shipPartDistancesToTargets && shipPartDistancesToTargets->size()) ? (*shipPartDistancesToTargets)[::llc::noise1DBase32((uint32_t)solarSystem.PlayState.Constants.Seed + iShip * ::ghg::MAX_ORBITER_COUNT + iShipPart) % shipPartDistancesToTargets->size()] : ::llc::n3f2_t{};
 		::llc::n3f2_t				targetPosition				= targetDistance + positionGlobal;
@@ -281,7 +280,7 @@ static	::llc::error_t	updateShipOrbiter			(::ghg::SGalaxyHell & solarSystem, int
 				}
 
 				if(solarSystem.PlayState.TimeStage > 1) {
-					solarSystem.ShipState.Engine.Integrator.Forces[solarSystem.ShipState.EntitySystem.Entities[solarSystem.ShipState.ShipPartEntity[iShipPart] + 1].Body].Rotation	= {};
+					solarSystem.ShipState.Engine.Integrator.Forces[solarSystem.ShipState.Engine.GetRigidBody(solarSystem.ShipState.GetShipPartEntity(iShipPart))].Rotation	= {};
 					::llc::m4f2_t			inverseTransform			= shipModuleMatrix.GetInverse();
 					::llc::SBodyCenter		& shipModuleTransform		= solarSystem.ShipState.GetOrbiterTransform(iShipPart);
 					::llc::n3f2_t			up							= {1, 0, 0};
@@ -325,7 +324,7 @@ static	::llc::error_t	shipsUpdate				(::ghg::SGalaxyHell & solarSystem, double s
 		if(0 >= ship.Health)
 			continue;
 		::llc::au1_t					& shipParts				= solarSystem.ShipState.SpaceshipManager.ShipParts[iShip];
-		::llc::SBodyCenter			& shipTransform			= solarSystem.ShipState.Engine.Integrator.Centers[solarSystem.ShipState.EntitySystem.Entities[solarSystem.ShipState.ShipCoreEntity[iShip]].Body];
+		::llc::SBodyCenter			& shipTransform			= solarSystem.ShipState.Engine.Integrator.Centers[solarSystem.ShipState.Engine.GetRigidBody(solarSystem.ShipState.ShipCoreEntity[iShip])];
 		if(ship.Team) { 
 			playing					= 1;
 
@@ -391,10 +390,10 @@ static	::llc::error_t	processInput			(::ghg::SGalaxyHell & solarSystem, double s
 		solarSystem.ShipState.Scene.Global.CameraReset();
 
 	constexpr double			speed					= 40;
-	if(solarSystem.ShipState.EntitySystem.Entities.size()) {
+	if(solarSystem.ShipState.Engine.Entities.size()) {
 		for(uint32_t iPlayer = 0; iPlayer < solarSystem.PlayState.Constants.Players; ++iPlayer) {
 			const ::ghg::SShipController	& shipController		= controllers[iPlayer];
-			::llc::SBodyCenter				& playerBody			= solarSystem.ShipState.Engine.Integrator.Centers[solarSystem.ShipState.EntitySystem.Entities[solarSystem.ShipState.ShipCoreEntity[iPlayer]].Body];
+			::llc::SBodyCenter				& playerBody			= solarSystem.ShipState.Engine.Integrator.Centers[solarSystem.ShipState.Engine.GetRigidBody(solarSystem.ShipState.ShipCoreEntity[iPlayer])];
 			::llc::SSpaceshipCore			& ship					= solarSystem.ShipState.SpaceshipManager.ShipCores[iPlayer];
 			bool							turbo					= shipController.Turbo;
 			double							speedMultiplier			= 1;
@@ -485,15 +484,15 @@ stacxpr	const double	UPDATE_STEP_TIME			= 0.012;
 	double						secondsToProcess			= ::llc::min(actualSecondsLastFrame, 0.15);
 	for(uint32_t iShip = 0; iShip < solarSystem.ShipState.SpaceshipManager.ShipCores.size(); ++iShip) {
 		::llc::au1_t					& shipParts					= solarSystem.ShipState.SpaceshipManager.ShipParts[iShip];
-		const uint32_t				iBody						= solarSystem.ShipState.EntitySystem.Entities[solarSystem.ShipState.ShipCoreEntity[iShip]].Body;
+		const uint32_t				iBody						= solarSystem.ShipState.Engine.GetRigidBody(solarSystem.ShipState.ShipCoreEntity[iShip]);
 		solarSystem.ShipState.Engine.Integrator.SetActive (iBody, true);
 		solarSystem.ShipState.Engine.Integrator.Flags[iBody].UpdatedTransform	= false;
 		for(uint32_t iPart = 0; iPart < shipParts.size(); ++iPart) {
 			::llc::SSpaceshipOrbiter	& shipPart					= solarSystem.ShipState.SpaceshipManager.Orbiters[shipParts[iPart]];
 			::std::lock_guard			lockUpdate					(solarSystem.LockUpdate);
 			memcpy(solarSystem.ShipState.WeaponManager.Shots[shipPart.Weapon].PositionDraw.begin(), solarSystem.ShipState.WeaponManager.Shots[shipPart.Weapon].Particles.Position.begin(), solarSystem.ShipState.WeaponManager.Shots[shipPart.Weapon].Particles.Position.size() * sizeof(::llc::n3f2_t));
-			solarSystem.ShipState.Engine.Integrator.SetActive(solarSystem.ShipState.EntitySystem.Entities[solarSystem.ShipState.ShipPartEntity[shipParts[iPart]]].Body, true);
-			solarSystem.ShipState.Engine.Integrator.Flags	 [solarSystem.ShipState.EntitySystem.Entities[solarSystem.ShipState.ShipPartEntity[shipParts[iPart]]].Body].UpdatedTransform	= false;
+			solarSystem.ShipState.Engine.Integrator.SetActive(solarSystem.ShipState.Engine.GetRigidBody(solarSystem.ShipState.ShipPartEntity[shipParts[iPart]]), true);
+			solarSystem.ShipState.Engine.Integrator.Flags	 [solarSystem.ShipState.Engine.GetRigidBody(solarSystem.ShipState.ShipPartEntity[shipParts[iPart]])].UpdatedTransform	= false;
 		}
 	}
 
@@ -531,10 +530,10 @@ stacxpr	const double	UPDATE_STEP_TIME			= 0.012;
 			}
 		}
 
-		for(uint32_t iEntity = 0; iEntity < solarSystem.ShipState.EntitySystem.Entities.size(); ++iEntity) {
-			const ::ghg::SGHEntity		& entity			= solarSystem.ShipState.EntitySystem.Entities[iEntity];
+		for(uint32_t iEntity = 0; iEntity < solarSystem.ShipState.Engine.Entities.size(); ++iEntity) {
+			const ::llc::SEntity		& entity			= solarSystem.ShipState.Engine.Entities[iEntity];
 			if(-1 == entity.Parent)	// process root entities
-				::updateEntityTransforms(iEntity, solarSystem.ShipState.EntitySystem.Entities, solarSystem.ShipState.EntitySystem.EntityChildren, solarSystem.ShipState.Scene, solarSystem.ShipState.Engine.Integrator);
+				::updateEntityTransforms(iEntity, solarSystem.ShipState.Engine.Entities, solarSystem.ShipState.Scene, solarSystem.ShipState.Engine.Integrator);
 		}
 		secondsToProcess		-= secondsLastFrameUnscaled;
 	}

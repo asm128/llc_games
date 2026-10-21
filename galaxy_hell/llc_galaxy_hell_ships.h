@@ -89,31 +89,32 @@ namespace ghg
 		::llc::aeid					ShipPartEntity		= {};
 
 		::llc::SEngine				Engine;
-		::ghg::SEntitySystem		EntitySystem		= {};
+		::llc::apod<::ghg::SGHEntityVisual> EntityVisuals = {};
 		::ghg::SShipScene			Scene				= {};
 
 		int32_t						Clear				()	{
 			SpaceshipManager.Clear();
 			WeaponManager.Clear();
-			::llc::clear(Scene.Transforms, ShipCoreEntity, ShipPartEntity);
+			::llc::clear(Scene.Transforms, ShipCoreEntity, ShipPartEntity, EntityVisuals);
 
 			Engine.Integrator.Clear();
 			Engine.Entities.clear();
 
-			EntitySystem				= {};
 			return 0;
 		}
 
-		inline	::llc::SBodyCenter&			GetShipPivot		(uint32_t indexShip)				{ return Engine.Integrator.Centers[EntitySystem.Entities[ShipCoreEntity[indexShip]].Body]; }
-		inline	const ::llc::SBodyCenter&	GetShipPivot		(uint32_t indexShip)		const	{ return Engine.Integrator.Centers[EntitySystem.Entities[ShipCoreEntity[indexShip]].Body]; }
+		inline	::llc::SBodyCenter&			GetShipPivot		(uint32_t indexShip)				{ return Engine.GetBodyCenter(ShipCoreEntity[indexShip]); }
+		inline	const ::llc::SBodyCenter&	GetShipPivot		(uint32_t indexShip)		const	{ return Engine.GetBodyCenter(ShipCoreEntity[indexShip]); }
 
 		inline	::llc::n3f2_t&				GetShipPosition		(uint32_t indexShip)				{ return GetShipPivot(indexShip).Position; }
 		inline	const ::llc::n3f2_t&			GetShipPosition		(uint32_t indexShip)		const	{ return GetShipPivot(indexShip).Position; }
 
 		::llc::error_t						GetShipPosition		(uint32_t iShip, ::llc::n3f2_t & output) const { output = GetShipPosition(iShip); return 0; }
 		
-		::llc::SBodyCenter&					GetOrbiterTransform	(uint32_t iPart)		{ return Engine.Integrator.Centers[EntitySystem.Entities[ShipPartEntity[iPart] + 1].Body]; }
-		::llc::SBodyForces&					GetShipOrbiterForces(uint32_t iPart)		{ return Engine.Integrator.Forces [EntitySystem.Entities[ShipPartEntity[iPart] + 1].Body]; }
+		::llc::eid_t						GetShipPartEntity	(uint32_t iPart) const { return Engine.Entities.GetIndexChild(ShipPartEntity[iPart], 0); }
+
+		::llc::SBodyCenter&					GetOrbiterTransform	(uint32_t iPart)		{ return Engine.GetBodyCenter(GetShipPartEntity(iPart)); }
+		::llc::SBodyForces&					GetShipOrbiterForces(uint32_t iPart)		{ return Engine.GetBodyForces(GetShipPartEntity(iPart)); }
 
 
 		::llc::error_t				Save				(::llc::au0_t & output)	const	{ 
@@ -123,9 +124,15 @@ namespace ghg
 			llc_necs(::llc::saveView(output, ShipCoreEntity));
 			llc_necs(::llc::saveView(output, ShipPartEntity));
 		
-			llc_necs(Engine.Save(output));
+			// Preserve the old engine block, which had no game entities, for existing saves.
+			if(Engine.Scene)
+				llc_necs(Engine.Scene->Save(output));
+			else
+				llc_necs(::llc::SEngineScene{}.Save(output));
+			llc_necs(::llc::SVirtualEntityManager{}.Save(output));
+			llc_necs(Engine.Integrator.Save(output));
 
-			llc_necs(EntitySystem	.Save(output));
+			llc_necs(::ghg::shipEntitiesSave(Engine.Entities, EntityVisuals, output));
 			llc_necs(Scene			.Save(output));
 			return 0; 
 		}
@@ -138,7 +145,7 @@ namespace ghg
 
 			llc_necs(Engine.Load(input));
 
-			llc_necs(EntitySystem	.Load(input));
+			llc_necs(::ghg::shipEntitiesLoad(Engine.Entities, EntityVisuals, input));
 			llc_necs(Scene			.Load(input));
 			return 0; 
 		}
