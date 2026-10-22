@@ -329,6 +329,7 @@ static	::llc::error_t	guiSetupSettings	(::ghg::SGalaxyHellApp & app, ::llc::SDia
 }
 
 static	::llc::error_t	guiHandleLoad		(::ghg::SGalaxyHellApp & app, ::llc::SGUI & gui, uint32_t idControl, ::ghg::SGalaxyHell & /*game*/) { 
+#if GH_SAVE_ENABLED
 	if(idControl < (gui.Controls.Text.size() - 2)) {
 		try {
 			if_true_ef(0 > ::ghg::solarSystemLoad(app.Game, gui.Controls.Text[idControl + 1].Text), "Failed to load file %i: '%s'", idControl + 1, gui.Controls.Text[idControl + 1].Text.begin());
@@ -359,13 +360,18 @@ static	::llc::error_t	guiHandleLoad		(::ghg::SGalaxyHellApp & app, ::llc::SGUI &
 			}
 		}
 	}
+#else
+	(void)app; (void)gui; (void)idControl;
+#endif
 	return ::ghg::APP_STATE_Home; 
 }
 
+#if GH_SAVE_ENABLED
 static	::llc::error_t	dialogCreateLoad	(::ghg::SGalaxyHellApp & app, ::llc::SDialog & dialogLoad, ::llc::view<::llc::vcst_t> pathFileNames, const ::llc::pobj<::llc::SInput> & inputState, const ::llc::n2f2_t & cursorPos) { 
 	::dialogCreateCommon(dialogLoad, inputState, cursorPos);
 	return ::llc::guiCreateControlList(*dialogLoad.GUI, pathFileNames, dialogLoad.Root, {256, 20}, {0, int16_t(-20 * pathFileNames.size() / 2)}, ::llc::ALIGN_CENTER, ::llc::ALIGN_LEFT, app.DialogControls[::ghg::APP_STATE_Load]);
 }
+#endif
 
 static	::llc::error_t	guiHandleHome		(::ghg::SGalaxyHellApp & app, ::llc::SGUI & /*gui*/, uint32_t idControl, ::ghg::SGalaxyHell & game) { 
 	switch((::ghg::UI_HOME)idControl) {
@@ -392,12 +398,16 @@ static	::llc::error_t	guiHandleHome		(::ghg::SGalaxyHellApp & app, ::llc::SGUI &
 		if_true_e(0 > app.Save(::ghg::SAVE_MODE_USER));
 		break;
 	case ::ghg::UI_HOME_Load: {
+#if GH_SAVE_ENABLED
 		::llc::aobj<::llc::vcst_t>	pathFileNames;
 		::ghg::listFilesSavegame(app, app.SavegameFolder, pathFileNames);
 
 		pathFileNames.push_back(::llc::vcs{"Back"});
 		::dialogCreateLoad(app, app.DialogPerState[::ghg::APP_STATE_Load], pathFileNames, app.DialogPerState[::ghg::APP_STATE_Home].Input, app.DialogPerState[::ghg::APP_STATE_Home].GUI->CursorPos);
 		return ::ghg::APP_STATE_Load;
+#else
+		break;
+#endif
 	}
 	case ::ghg::UI_HOME_Settings: return ::ghg::APP_STATE_Settings; 
 	case ::ghg::UI_HOME_Credits: return ::ghg::APP_STATE_About; 
@@ -531,7 +541,7 @@ static	::llc::error_t	uiPlayerUpdatePlay	(::ghg::SUIPlayer & uiPlayer, uint32_t 
 		{ // Update ship part render and health bar
 			::llc::m4f2_t				matrixView		= {};
 			::llc::SCameraPoints		& camera		= viewport.Camera;
-			camera.Target			= game.ShipState.Scene.Transforms[game.ShipState.EntityVisuals[game.ShipState.GetShipPartEntity(iOrbiter)].Transform].GetTranslation();
+			camera.Target			= game.ShipState.GetTransform(game.ShipState.GetShipPartEntity(iOrbiter)).GetTranslation();
 			camera.Position			= camera.Target;
 			camera.Position.y		+= 7; //-= 20;
 			stacxpr	::llc::n3f2_t		cameraUp		= {1, 0, 0};

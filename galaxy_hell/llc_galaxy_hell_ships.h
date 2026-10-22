@@ -6,12 +6,15 @@
 #include "llc_geometry_lh.h"
 #include "llc_model.h"
 #include "llc_engine.h"
+#include "llc_engine_shader.h"
 #include "llc_camera.h"
 #include "llc_img_color.h"
 #include "llc_view_n3.h"
 
 #ifndef LLC_GALAXY_HELL_SHIPS_H
 #define LLC_GALAXY_HELL_SHIPS_H
+
+#define GH_SAVE_ENABLED 0 // Deferred while validating the engine migration.
 
 namespace ghg
 {
@@ -53,23 +56,12 @@ namespace ghg
 #pragma pack(pop)
 
 	struct SShipScene {
-		::ghg::SShipSceneGlobal				Global;
-		::llc::aobj<::llc::SGeometryQuads>	Geometry		= {};
-		::llc::aobj<::llc::img8bgra>		Image			= {};
-		::llc::apod<::llc::m4f2_t>			Transforms		= {}; // Ope per entity
+		::ghg::SShipSceneGlobal			Global;
 
-		::llc::error_t						Save			(::llc::au0_t & output) const { 
-			llc_necs(::llc::savePOD		(output, Global));
-			llc_necs(::llc::saveView	(output, Transforms));
-			info_printf("Saved %s, %i", "Transforms"	, Transforms.size());
-			return 0; 
-		}
-
-		::llc::error_t						Load			(::llc::vcu0_t & input) { 
-			llc_necs(::llc::loadPOD	(input, Global		));
-			llc_necs(::llc::loadView(input, Transforms	));
-			return 0; 
-		}
+#if GH_SAVE_ENABLED
+		::llc::error_t					Save	(::llc::au0_t & output) const { return ::llc::savePOD(output, Global); }
+		::llc::error_t					Load	(::llc::vcu0_t & input)       { return ::llc::loadPOD(input, Global); }
+#endif
 	};
 
 	::llc::error_t			getLightArrays
@@ -89,17 +81,59 @@ namespace ghg
 		::llc::aeid					ShipPartEntity		= {};
 
 		::llc::SEngine				Engine;
-		::llc::apod<::ghg::SGHEntityVisual> EntityVisuals = {};
+		::llc::lmpod<int32_t, ::llc::u2_t> ModelNodes = {};
 		::ghg::SShipScene			Scene				= {};
 
-		int32_t						Clear				()	{
+		::llc::error_t				ResetModelNodes		() {
+			::llc::SRenderNodeManager nodes;
+			for(uint32_t iModel = 0; iModel < ModelNodes.size(); ++iModel) {
+				const uint32_t mesh = Engine.Scene->RenderNodes[ModelNodes.Values[iModel]].Mesh;
+				llc_necs(ModelNodes.Values[iModel] = nodes.Create());
+				::llc::SRenderNode & node = nodes[ModelNodes.Values[iModel]];
+				node.Mesh = mesh;
+				node.Slice = 0;
+				nodes.Flags[ModelNodes.Values[iModel]].NoDraw = true;
+			}
+			Engine.Scene->RenderNodes = nodes;
+			return 0;
+		}
+
+		::llc::error_t				Clear				() {
 			SpaceshipManager.Clear();
 			WeaponManager.Clear();
-			::llc::clear(Scene.Transforms, ShipCoreEntity, ShipPartEntity, EntityVisuals);
-
+			::llc::clear(ShipCoreEntity, ShipPartEntity);
 			Engine.Integrator.Clear();
 			Engine.Entities.clear();
+			return ResetModelNodes();
+		}
 
+		const ::llc::SRenderNode&		GetNode				(::llc::eid_t entity) const { return Engine.Scene->RenderNodes[Engine.GetRenderNode(entity)]; }
+		::llc::SRenderNode&			GetNode				(::llc::eid_t entity)       { return Engine.Scene->RenderNodes[Engine.GetRenderNode(entity)]; }
+		const ::llc::m4f2_t&			GetTransform		(::llc::eid_t entity) const { return Engine.Scene->RenderNodes.Transforms[Engine.GetRenderNode(entity)].Model; }
+		::llc::error_t				GetModelMesh		(int32_t model) const { return Engine.Scene->RenderNodes[ModelNodes.Values[ModelNodes.Keys.find(model)]].Mesh; }
+
+		::llc::error_t				GetGeometry			(uint32_t iMesh, ::ghg::SShipGeometry & geometry) const {
+			const ::llc::SEngineGraphics & graphics = *Engine.Scene->Graphics;
+			const ::llc::SGeometryMesh & mesh = *graphics.Meshes[iMesh];
+			const ::llc::au0_t & positions = graphics.Buffers[mesh.GeometryBuffers[1]]->Data;
+			const ::llc::au0_t & normals = graphics.Buffers[mesh.GeometryBuffers[2]]->Data;
+			const ::llc::au0_t & uv = graphics.Buffers[mesh.GeometryBuffers[3]]->Data;
+			geometry.Triangles = {(const ::llc::tri3f2_t*)positions.begin(), positions.size() / uint32_t(sizeof(::llc::tri3f2_t))};
+			geometry.Normals = {(const ::llc::n3f2_t*)normals.begin(), normals.size() / uint32_t(sizeof(::llc::n3f2_t))};
+			geometry.TextureCoords = {(const ::llc::tri2f2_t*)uv.begin(), uv.size() / uint32_t(sizeof(::llc::tri2f2_t))};
+			return 0;
+		}
+		::llc::error_t				GetImage			(uint32_t iSurface, ::llc::gc8bgra & image) const {
+			const ::llc::SSurface & surface = *Engine.Scene->Graphics->Surfaces[iSurface];
+			image = {(const ::llc::bgra*)surface.Data.begin(), surface.Desc.Dimensions.u2()};
+			return 0;
+		}
+		::llc::error_t				BindShaders			() {
+			::llc::SShaderManager & shaders = Engine.Scene->Graphics->Shaders;
+			shaders = {};
+			llc_necs(shaders.Create());
+			if_null_fe(shaders[0].create(::llc::psTerrestrial));
+			shaders.Names[0] = "psTerrestrial";
 			return 0;
 		}
 
@@ -117,6 +151,7 @@ namespace ghg
 		::llc::SBodyForces&					GetShipOrbiterForces(uint32_t iPart)		{ return Engine.GetBodyForces(GetShipPartEntity(iPart)); }
 
 
+#if GH_SAVE_ENABLED
 		::llc::error_t				Save				(::llc::au0_t & output)	const	{ 
 			llc_necs(SpaceshipManager.Save(output));
 			llc_necs(WeaponManager.Save(output));
@@ -124,15 +159,9 @@ namespace ghg
 			llc_necs(::llc::saveView(output, ShipCoreEntity));
 			llc_necs(::llc::saveView(output, ShipPartEntity));
 		
-			// Preserve the old engine block, which had no game entities, for existing saves.
-			if(Engine.Scene)
-				llc_necs(Engine.Scene->Save(output));
-			else
-				llc_necs(::llc::SEngineScene{}.Save(output));
-			llc_necs(::llc::SVirtualEntityManager{}.Save(output));
-			llc_necs(Engine.Integrator.Save(output));
-
-			llc_necs(::ghg::shipEntitiesSave(Engine.Entities, EntityVisuals, output));
+			llc_necs(Engine.Save(output));
+			llc_necs(::llc::saveView(output, ModelNodes.Keys));
+			llc_necs(::llc::saveView(output, ModelNodes.Values));
 			llc_necs(Scene			.Save(output));
 			return 0; 
 		}
@@ -145,10 +174,13 @@ namespace ghg
 
 			llc_necs(Engine.Load(input));
 
-			llc_necs(::ghg::shipEntitiesLoad(Engine.Entities, EntityVisuals, input));
+			llc_necs(::llc::loadView(input, ModelNodes.Keys));
+			llc_necs(::llc::loadView(input, ModelNodes.Values));
+			llc_necs(BindShaders());
 			llc_necs(Scene			.Load(input));
 			return 0; 
 		}
+#endif
 	};
 
 }

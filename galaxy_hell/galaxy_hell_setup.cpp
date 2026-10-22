@@ -14,6 +14,7 @@
 using ::llc::get_value_namep, ::llc::get_enum_namep, ::llc::failed;
 LLC_USING_TYPEINT();
 
+#if GH_SAVE_ENABLED
 ::llc::error_t			ghg::solarSystemSave	(const ::ghg::SGalaxyHell & game, ::llc::vcst_t fileName) {
 	::llc::au0_t					serialized;
 	llc_necs(game.Save(serialized));
@@ -35,62 +36,52 @@ LLC_USING_TYPEINT();
 	world.PlayState.GlobalState.Paused		= true;
 	return 0;
 }
+#endif
 
-static	::llc::error_t	shipCreate				(::ghg::SShipManager & shipState, int32_t teamId, int32_t iGeometry, int32_t iImage)	{
-	::ghg::SShipScene			& scene					= shipState.Scene;
-	const uint32_t				countParts				= 6;
-	::llc::SSpaceshipCore		ship					= {};
-	int32_t						iEntityMain;
-	llc_necs(iEntityMain = shipState.Engine.Entities.Create());
-	llc_necs(shipState.EntityVisuals.push_back({-1, scene.Transforms.push_back(shipState.Engine.Integrator.MatrixIdentity4), -1}));
-	shipState.Engine.Entities[iEntityMain].RigidBody = shipState.Engine.Integrator.Create();
+static	::llc::error_t	shipCreate				(::ghg::SShipManager & shipState, int32_t teamId, int32_t iGeometry, int32_t iImage) {
+	::llc::SEngine & engine = shipState.Engine;
+	const uint32_t countParts = 6;
+	::llc::SSpaceshipCore ship = {};
+	int32_t iEntityMain;
+	llc_necs(iEntityMain = engine.Entities.Create());
+	llc_necs(engine.Entities[iEntityMain].RenderNode = engine.Scene->RenderNodes.Create());
+	llc_necs(engine.Entities[iEntityMain].RigidBody = engine.Integrator.Create());
+	llc_necs(engine.SetHidden(iEntityMain, true));
 	llc_necs(shipState.ShipCoreEntity.push_back(iEntityMain));
 	ship.Team = teamId;
-	const int32_t				indexShip				= shipState.SpaceshipManager.ShipCores.push_back(ship);
+	const int32_t indexShip = shipState.SpaceshipManager.ShipCores.push_back(ship);
 	shipState.SpaceshipManager.ShipParts.push_back({});
 	shipState.SpaceshipManager.ShipScores.push_back({});
-
 	for(uint32_t iPart = 0; iPart < countParts; ++iPart) {
-		int32_t						iEntityOrbit;
-		llc_necs(iEntityOrbit = shipState.Engine.Entities.Create());
-		llc_necs(shipState.EntityVisuals.push_back({-1, scene.Transforms.push_back(shipState.Engine.Integrator.MatrixIdentity4), -1}));
-		int32_t						iBodyOrbit;
-		llc_necs(iBodyOrbit = ::llc::createOrbiter(shipState.Engine.Integrator
-			, ::llc::AXIS_X_POSITIVE
-			, ::llc::AXIS_Y_NEGATIVE
-			, 0		//PLANET_ORBITALINCLINATION	[iPlanet]
-			, 6		//PLANET_ORBITALPERIOD		[iPlanet]
-			, 1		//PLANET_ORBITALUNIT		[iPlanet]
-			, 0		//PLANET_AXIALTILT			[iPlanet]
-			, 2.5	//PLANET_DISTANCE			[iPlanet]
-			, 1		//1.0 / PLANET_DISTANCE		[PLANET_COUNT - 1] * 2500
-			, 1		//PLANET_DAY				[iPlanet]
-			, 2		//PLANET_DAY				[PLANET_EARTH]
-			));
-		shipState.Engine.Entities[iEntityOrbit].RigidBody = iBodyOrbit;
-		shipState.Engine.Integrator.Centers[iBodyOrbit].Orientation.MakeFromEuler(0, (float)(::llc::math_2pi / countParts * iPart), 0);
-		shipState.Engine.Integrator.SetActive(iBodyOrbit, true);
+		int32_t iEntityOrbit;
+		llc_necs(iEntityOrbit = engine.Entities.Create());
+		llc_necs(engine.Entities[iEntityOrbit].RenderNode = engine.Scene->RenderNodes.Create());
+		llc_necs(engine.Entities[iEntityOrbit].RigidBody = engine.Integrator.Create());
+		llc_necs(engine.SetHidden(iEntityOrbit, true));
+		llc_necs(::llc::initOrbiterOrbit(engine.GetBodyCenter(iEntityOrbit), engine.GetBodyForces(iEntityOrbit), 0, 6, 1));
+		engine.GetBodyCenter(iEntityOrbit).Orientation.MakeFromEuler(0, (float)(::llc::math_2pi / countParts * iPart), 0);
+		llc_necs(engine.SetPhysicsActive(iEntityOrbit, true));
 
-		int32_t						indexEntityPart;
-		llc_necs(indexEntityPart = shipState.Engine.Entities.Create());
-		llc_necs(shipState.EntityVisuals.push_back({iGeometry, scene.Transforms.push_back(shipState.Engine.Integrator.MatrixIdentity4), int32_t(iImage % shipState.Scene.Image.size())}));
-		// createOrbiter still owns the allocation of this pair of rigid bodies.
-		shipState.Engine.Entities[indexEntityPart].RigidBody = iBodyOrbit + 1;
-		llc_necs(shipState.Engine.SetParent(indexEntityPart, iEntityOrbit));
-		shipState.Engine.Integrator.SetActive(iBodyOrbit + 1, true);
+		int32_t indexEntityPart;
+		const int32_t model = (iGeometry <= 0) ? ::llc::SHIP_GEOMETRY_Engine : iGeometry;
+		llc_necs(indexEntityPart = engine.CreateEntityFromGeometry("Ship module", {.5f, .5f, .5f}, false, model, shipState.ModelNodes
+			, [](::llc::SGeometryBuffers &) { return -1; })); // Models were built at setup.
+		llc_necs(::llc::initOrbitCenter(engine.GetBodyCenter(indexEntityPart), ::llc::AXIS_X_POSITIVE, 0, 2.5));
+		llc_necs(::llc::initOrbitRotation(engine.GetBodyForces(indexEntityPart), ::llc::AXIS_Y_NEGATIVE, engine.GetBodyCenter(indexEntityPart).Orientation, 1, 2));
+		llc_necs(engine.SetParent(indexEntityPart, iEntityOrbit));
+		llc_necs(engine.SetPhysicsActive(indexEntityPart, true));
+		llc_necs(engine.SetHidden(indexEntityPart, iGeometry <= 0));
+		shipState.GetNode(indexEntityPart).Skin = iImage % engine.Scene->Graphics->Skins.size();
+		shipState.GetNode(indexEntityPart).Shader = 0;
 
-		::llc::SSpaceshipOrbiter				shipPart				= {};
+		::llc::SSpaceshipOrbiter shipPart = {};
 		shipState.ShipPartEntity.push_back(iEntityOrbit);
 		shipState.SpaceshipManager.ShipParts[indexShip].push_back((uint16_t)shipState.SpaceshipManager.Orbiters.push_back(shipPart));
 		shipState.SpaceshipManager.ShipOrbiterActionQueue.push_back({});
-		llc_necs(shipState.Engine.SetParent(iEntityOrbit, iEntityMain));
+		llc_necs(engine.SetParent(iEntityOrbit, iEntityMain));
 	}
 	return indexShip;
 }
-
-//static	int			engineCreate		(::ghg::SGalaxyHell & solarSystem, int32_t iImage)	{
-//	return 0;
-//}
 
 static	::llc::error_t	shipGeometryBuildEngine			(::llc::SGeometryQuads & geometry)			{
 	::llc::geometryBuildHelix(geometry, 8U, 8U, 0.15f, {0, 1.1f, 0}, {1, 1, 1});
@@ -176,41 +167,87 @@ static	::llc::error_t	shipGeometryBuildShred		(::llc::SGeometryQuads & geometry)
 	return 0;
 }
 
-static	::llc::error_t	modelsSetupOld			(::ghg::SShipScene & scene)			{
-	scene.Geometry.resize(::llc::get_value_count<llc::SHIP_GEOMETRY>() * 1024);
+static	::llc::error_t	modelsSetup			(::ghg::SShipManager & shipState)			{
+	if(shipState.ModelNodes.size())
+		return 0;
+	::llc::SEngine & engine = shipState.Engine;
+	if(!engine.Scene->Graphics)
+		if_null_fe(engine.Scene->Graphics.create());
+	::llc::SEngineGraphics & graphics = *engine.Scene->Graphics;
+	::llc::aobj<::llc::SGeometryQuads> geometryQuads;
+	llc_necs(geometryQuads.resize(::llc::SHIP_GEOMETRY_Nitro + 1));
 
-	::shipGeometryBuildEngine		(scene.Geometry[::llc::SHIP_GEOMETRY_Engine			]);
-	::shipGeometryBuildGun			(scene.Geometry[::llc::SHIP_GEOMETRY_Gun			]);
-	::shipGeometryBuildWafer		(scene.Geometry[::llc::SHIP_GEOMETRY_Wafer			]);
-	::shipGeometryBuildCannon		(scene.Geometry[::llc::SHIP_GEOMETRY_Cannon			]);
-	::shipGeometryBuildShotgun		(scene.Geometry[::llc::SHIP_GEOMETRY_Shotgun		]);
-	::shipGeometryBuildWaferShotgun	(scene.Geometry[::llc::SHIP_GEOMETRY_WaferShotgun	]);
-	::shipGeometryBuildCannonball	(scene.Geometry[::llc::SHIP_GEOMETRY_Cannonball		]);
-	::shipGeometryBuildRocket		(scene.Geometry[::llc::SHIP_GEOMETRY_Rocket			]);
-	::shipGeometryBuildMissile		(scene.Geometry[::llc::SHIP_GEOMETRY_Missile		]);
-	::shipGeometryBuildBullet		(scene.Geometry[::llc::SHIP_GEOMETRY_Bullet			]);
-	::shipGeometryBuildShred		(scene.Geometry[::llc::SHIP_GEOMETRY_Shred			]);
+	::shipGeometryBuildEngine		(geometryQuads[::llc::SHIP_GEOMETRY_Engine			]);
+	::shipGeometryBuildGun			(geometryQuads[::llc::SHIP_GEOMETRY_Gun			]);
+	::shipGeometryBuildWafer		(geometryQuads[::llc::SHIP_GEOMETRY_Wafer			]);
+	::shipGeometryBuildCannon		(geometryQuads[::llc::SHIP_GEOMETRY_Cannon			]);
+	::shipGeometryBuildShotgun		(geometryQuads[::llc::SHIP_GEOMETRY_Shotgun		]);
+	::shipGeometryBuildWaferShotgun	(geometryQuads[::llc::SHIP_GEOMETRY_WaferShotgun	]);
+	::shipGeometryBuildCannonball	(geometryQuads[::llc::SHIP_GEOMETRY_Cannonball		]);
+	::shipGeometryBuildRocket		(geometryQuads[::llc::SHIP_GEOMETRY_Rocket			]);
+	::shipGeometryBuildMissile		(geometryQuads[::llc::SHIP_GEOMETRY_Missile		]);
+	::shipGeometryBuildBullet		(geometryQuads[::llc::SHIP_GEOMETRY_Bullet			]);
+	::shipGeometryBuildShred		(geometryQuads[::llc::SHIP_GEOMETRY_Shred			]);
 
-	::llc::geometryBuildCube		(scene.Geometry[::llc::SHIP_GEOMETRY_Cube			], {1, 1, 1});
-	::llc::geometryBuildSphere		(scene.Geometry[::llc::SHIP_GEOMETRY_Sphere			], 16U, 16U, .5f, {0, 0});
-	::llc::geometryBuildCylinder	(scene.Geometry[::llc::SHIP_GEOMETRY_Cylinder		],  1U, 32U, .5, .5, {0, 0}, {1, 1, 1});
+	::llc::geometryBuildCube		(geometryQuads[::llc::SHIP_GEOMETRY_Cube			], {1, 1, 1});
+	::llc::geometryBuildSphere		(geometryQuads[::llc::SHIP_GEOMETRY_Sphere			], 16U, 16U, .5f, {0, 0});
+	::llc::geometryBuildCylinder	(geometryQuads[::llc::SHIP_GEOMETRY_Cylinder		],  1U, 32U, .5, .5, {0, 0}, {1, 1, 1});
+	for(uint32_t iModel = 0; iModel < geometryQuads.size(); ++iModel) {
+		const ::llc::SGeometryQuads & source = geometryQuads[iModel];
+		if(0 == source.Triangles.size())
+			continue;
+		int32_t entity;
+		llc_necs(entity = engine.CreateEntityFromGeometry(::llc::get_value_namev((::llc::SHIP_GEOMETRY)iModel), {.5f, .5f, .5f}, false, int32_t(iModel), shipState.ModelNodes
+			, [&source](::llc::SGeometryBuffers & geometry) {
+				for(uint32_t iTriangle = 0; iTriangle < source.Triangles.size(); ++iTriangle) {
+					const ::llc::tri3f2_t & triangle = source.Triangles[iTriangle];
+					const ::llc::tri2f2_t & uv = source.TextureCoords[iTriangle];
+					const uint32_t first = geometry.Positions.size();
+					llc_necs(geometry.Positions.append({triangle.A, triangle.B, triangle.C}));
+					llc_necs(geometry.TextureCoords.append({uv.A, uv.B, uv.C}));
+					llc_necs(geometry.Normals.append({source.Normals[iTriangle / 2], source.Normals[iTriangle / 2], source.Normals[iTriangle / 2]}));
+					llc_necs(geometry.PositionIndices.append({first, first + 1, first + 2}));
+				}
+				return 0;
+			}));
+		::llc::SRenderNode & node = shipState.GetNode(entity);
+		llc_necs(graphics.Meshes[node.Mesh]->GeometrySlices.push_back({{0, source.Triangles.size() * 3}}));
+		node.Slice = 0;
+		llc_necs(engine.SetHidden(entity, true));
+	}
+	engine.Entities.clear();
+	engine.Integrator.Clear();
+	llc_necs(shipState.BindShaders());
 	{
 
 		::llc::apod<::llc::rgbaf>	baseColors;
 		for(uint32_t i = 0; i < 4096; ++i)
 			baseColors.push_back({(float)::llc::noiseNormal1D(rand()), (float)::llc::noiseNormal1D(rand()), (float)::llc::noiseNormal1D(rand()), 1});
 
-		scene.Image.resize(256);
-		for(uint32_t iImage = 0; iImage < scene.Image.size(); ++iImage) {
-			::llc::img<::llc::bgra>		& image					= scene.Image[iImage];
-			if(image.Texels.size())
+		while(graphics.Surfaces.size() < 256) {
+			llc_necs(graphics.Surfaces.Create());
+			llc_necs(graphics.Skins.Create());
+			if_null_fe(graphics.Surfaces[graphics.Surfaces.size() - 1].create());
+			if_null_fe(graphics.Skins[graphics.Skins.size() - 1].create());
+		}
+		for(uint32_t iImage = 0; iImage < graphics.Surfaces.size(); ++iImage) {
+			::llc::SSurface & surface = *graphics.Surfaces[iImage];
+			::llc::SSkin & skin = *graphics.Skins[iImage];
+			skin.Material.Color.Diffuse = ::llc::WHITE;
+			skin.Material.Color.Ambient = ::llc::rgbaf(::llc::WHITE) * .1f;
+			llc_necs(skin.Textures.push_back(iImage));
+			if(surface.Data.size())
 				continue;
-			image.resize(::llc::n2u2_t{32, 5});
+			surface.Desc.ColorType = ::llc::COLOR_TYPE_BGRA;
+			surface.Desc.BitDepth = 8;
+			surface.Desc.Dimensions = {32, 5};
+			llc_necs(surface.Data.resize(32 * 5 * sizeof(::llc::bgra)));
+			::llc::g8bgra image = {(::llc::bgra*)surface.Data.begin(), surface.Desc.Dimensions.u2()};
 			for(uint32_t y = 0; y < image.metrics().y; ++y) {// Generate noise color for planet texture
 				bool						xAffect					= (y % 2);
 				::llc::rgbaf				lineColor				= baseColors[(iImage + (rand() % 4)) % (baseColors.size() - 4)];
 				for(uint32_t x = 0; x < image.metrics().x; ++x) {
-					image.Texels[y * image.metrics().x + x]				= (lineColor * (xAffect ? ::llc::max(.25, ::llc::sin(x * (1.0 / image.metrics().x * ::llc::math_pi))) : 1)).Clamp();
+					image[y][x]				= (lineColor * (xAffect ? ::llc::max(.25, ::llc::sin(x * (1.0 / image.metrics().x * ::llc::math_pi))) : 1)).Clamp();
 				}
 			}
 		}
@@ -218,59 +255,11 @@ static	::llc::error_t	modelsSetupOld			(::ghg::SShipScene & scene)			{
 	return 0;
 }
 
-static	::llc::error_t	shipNodeCreateRoot	(::llc::SRenderNodeManager & nodes, ::llc::SEngineGraphics & graphics) {
-	llc::SMeshManager			& meshes			= graphics.Meshes;
-	const uint32_t				rootNode			= (uint32_t)nodes.Create();
-	nodes[rootNode].Mesh	= (uint32_t)meshes.Create();
-	meshes[nodes[rootNode].Mesh]->ConstantBuffers.clear();
-	meshes[nodes[rootNode].Mesh]->Desc.Type			= ::llc::GEOMETRY_TYPE_Triangle;
-	meshes[nodes[rootNode].Mesh]->Desc.Mode			= ::llc::MESH_MODE_List;
-	return rootNode;
-}
-
-static	::llc::error_t	shipNodeBuildEngine			(::llc::SRenderNodeManager & nodes, ::llc::SEngineGraphics & graphics) { const uint32_t rootNode = (uint32_t)shipNodeCreateRoot(nodes, graphics); return rootNode; }
-static	::llc::error_t	shipNodeBuildWafer			(::llc::SRenderNodeManager & nodes, ::llc::SEngineGraphics & graphics) { const uint32_t rootNode = (uint32_t)shipNodeCreateRoot(nodes, graphics); return rootNode; }
-static	::llc::error_t	shipNodeBuildWaferShotgun	(::llc::SRenderNodeManager & nodes, ::llc::SEngineGraphics & graphics) { const uint32_t rootNode = (uint32_t)shipNodeCreateRoot(nodes, graphics); return rootNode; }
-static	::llc::error_t	shipNodeBuildGun			(::llc::SRenderNodeManager & nodes, ::llc::SEngineGraphics & graphics) { const uint32_t rootNode = (uint32_t)shipNodeCreateRoot(nodes, graphics); return rootNode; }
-static	::llc::error_t	shipNodeBuildShotgun		(::llc::SRenderNodeManager & nodes, ::llc::SEngineGraphics & graphics) { const uint32_t rootNode = (uint32_t)shipNodeCreateRoot(nodes, graphics); return rootNode; }
-static	::llc::error_t	shipNodeBuildCannon			(::llc::SRenderNodeManager & nodes, ::llc::SEngineGraphics & graphics) { const uint32_t rootNode = (uint32_t)shipNodeCreateRoot(nodes, graphics); return rootNode; }
-static	::llc::error_t	shipNodeBuildCannonball		(::llc::SRenderNodeManager & nodes, ::llc::SEngineGraphics & graphics) { const uint32_t rootNode = (uint32_t)shipNodeCreateRoot(nodes, graphics); return rootNode; }
-static	::llc::error_t	shipNodeBuildRocket			(::llc::SRenderNodeManager & nodes, ::llc::SEngineGraphics & graphics) { const uint32_t rootNode = (uint32_t)shipNodeCreateRoot(nodes, graphics); return rootNode; }
-static	::llc::error_t	shipNodeBuildMissile		(::llc::SRenderNodeManager & nodes, ::llc::SEngineGraphics & graphics) { const uint32_t rootNode = (uint32_t)shipNodeCreateRoot(nodes, graphics); return rootNode; }
-static	::llc::error_t	shipNodeBuildBullet			(::llc::SRenderNodeManager & nodes, ::llc::SEngineGraphics & graphics) { const uint32_t rootNode = (uint32_t)shipNodeCreateRoot(nodes, graphics); return rootNode; }
-static	::llc::error_t	shipNodeBuildShred			(::llc::SRenderNodeManager & nodes, ::llc::SEngineGraphics & graphics) { const uint32_t rootNode = (uint32_t)shipNodeCreateRoot(nodes, graphics); return rootNode; }
-
-static	::llc::error_t	modelsSetup			(::llc::SEngine & engine)			{
-	llc::pobj<llc::SEngineScene>	scene			= engine.Scene;
-
-	llc::SRenderNodeManager		& nodes				= scene->RenderNodes;
-	llc::pobj<llc::SEngineGraphics>	& graphics		= scene->Graphics;
-	if(!graphics) 
-		graphics.create();
-
-	::shipNodeBuildEngine		(nodes, *graphics);
-	::shipNodeBuildGun			(nodes, *graphics);
-	::shipNodeBuildWafer		(nodes, *graphics);
-	::shipNodeBuildCannon		(nodes, *graphics);
-	::shipNodeBuildShotgun		(nodes, *graphics);
-	::shipNodeBuildWaferShotgun	(nodes, *graphics);
-	::shipNodeBuildCannonball	(nodes, *graphics);
-	::shipNodeBuildRocket		(nodes, *graphics);
-	::shipNodeBuildMissile		(nodes, *graphics);
-	::shipNodeBuildBullet		(nodes, *graphics);
-	::shipNodeBuildShred		(nodes, *graphics);
-
-	//::llc::geometryBuildCube		(scene.Geometry[::llc::SHIP_GEOMETRY_CUBE			], {1, 1, 1});
-	//::llc::geometryBuildSphere	(scene.Geometry[::llc::SHIP_GEOMETRY_SPHERE			], 16U, 16U, .5f, {0, 0});
-	//::llc::geometryBuildCylinder	(scene.Geometry[::llc::SHIP_GEOMETRY_CYLINDER		],  1U, 32U, .5, .5, {0, 0}, {1, 1, 1});
-
-	return 0;
-}
 
 ::llc::error_t			ghg::solarSystemReset	(::ghg::SGalaxyHell & solarSystem)	{	// Set up enemy ships
 	::std::lock_guard			lock					(solarSystem.LockUpdate);
 	solarSystem.ShipControllers.clear();
-	solarSystem.ShipState.Clear();
+	llc_necs(solarSystem.ShipState.Clear());
 	solarSystem.DecoState	= {};
 	solarSystem.PlayState	= {};
 	::llc::rasterFontDefaults(solarSystem.DecoState.FontManager);
@@ -349,7 +338,7 @@ static	::llc::error_t	modelsSetup			(::llc::SEngine & engine)			{
 			solarSystem.PlayState.SimulatedTime			= {};
 			solarSystem.PlayState.TimeStage				= 0;
 			solarSystem.PlayState.TimeRealStage			= 0;
-			solarSystem.ShipState.Clear();
+			llc_necs(solarSystem.ShipState.Clear());
 		}
 		solarSystem.ShipState.WeaponManager.Weapons.clear();
 		solarSystem.ShipState.WeaponManager.Shots.clear();
@@ -432,17 +421,18 @@ static	::llc::error_t	modelsSetup			(::llc::SEngine & engine)			{
 				solarSystem.ShipState.WeaponManager.Shots.push_back({});
 				solarSystem.ShipState.WeaponManager.WeaponTargets.push_back({});
 
-					 if(shipPart.Type == ::llc::SHIP_PART_TYPE_Gun			) { solarSystem.ShipState.EntityVisuals[solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])].Geometry = ::llc::SHIP_GEOMETRY_Gun;			}
-				else if(shipPart.Type == ::llc::SHIP_PART_TYPE_Wafer		) { solarSystem.ShipState.EntityVisuals[solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])].Geometry = ::llc::SHIP_GEOMETRY_Wafer;		}
-				else if(shipPart.Type == ::llc::SHIP_PART_TYPE_Shotgun		) { solarSystem.ShipState.EntityVisuals[solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])].Geometry = ::llc::SHIP_GEOMETRY_Shotgun;		}
-				else if(shipPart.Type == ::llc::SHIP_PART_TYPE_Cannon		) { solarSystem.ShipState.EntityVisuals[solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])].Geometry = ::llc::SHIP_GEOMETRY_Cannon;		}
-				else if(shipPart.Type == ::llc::SHIP_PART_TYPE_ShotgunWafer	) { solarSystem.ShipState.EntityVisuals[solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])].Geometry = ::llc::SHIP_GEOMETRY_WaferShotgun;	}
+					 if(shipPart.Type == ::llc::SHIP_PART_TYPE_Gun			) { solarSystem.ShipState.GetNode(solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])).Mesh = solarSystem.ShipState.GetModelMesh(::llc::SHIP_GEOMETRY_Gun);			}
+				else if(shipPart.Type == ::llc::SHIP_PART_TYPE_Wafer		) { solarSystem.ShipState.GetNode(solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])).Mesh = solarSystem.ShipState.GetModelMesh(::llc::SHIP_GEOMETRY_Wafer);		}
+				else if(shipPart.Type == ::llc::SHIP_PART_TYPE_Shotgun		) { solarSystem.ShipState.GetNode(solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])).Mesh = solarSystem.ShipState.GetModelMesh(::llc::SHIP_GEOMETRY_Shotgun);		}
+				else if(shipPart.Type == ::llc::SHIP_PART_TYPE_Cannon		) { solarSystem.ShipState.GetNode(solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])).Mesh = solarSystem.ShipState.GetModelMesh(::llc::SHIP_GEOMETRY_Cannon);		}
+				else if(shipPart.Type == ::llc::SHIP_PART_TYPE_ShotgunWafer	) { solarSystem.ShipState.GetNode(solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])).Mesh = solarSystem.ShipState.GetModelMesh(::llc::SHIP_GEOMETRY_WaferShotgun);	}
+				llc_necs(solarSystem.ShipState.Engine.SetHidden(solarSystem.ShipState.GetShipPartEntity(shipParts[iPart]), false));
 				ship.Health				+= shipPart.Health.Value;
 				const uint32_t				width		= ::llc::get_value_count<::llc::WEAPON_LOAD>();
 				const uint32_t				height		= ::llc::get_value_count<::llc::WEAPON_TYPE>();
 				const uint32_t				depth		= ::llc::get_value_count<::llc::SHIP_PART_TYPE>();
-				solarSystem.ShipState.EntityVisuals[solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])].Image	= iShip * width * height * depth + shipPart.Type * width * height + newWeapon.Type * width + newWeapon.Shot.Type;
-				solarSystem.ShipState.EntityVisuals[solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])].Image	%= solarSystem.ShipState.Scene.Image.size();
+				solarSystem.ShipState.GetNode(solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])).Skin	= iShip * width * height * depth + shipPart.Type * width * height + newWeapon.Type * width + newWeapon.Shot.Type;
+				solarSystem.ShipState.GetNode(solarSystem.ShipState.GetShipPartEntity(shipParts[iPart])).Skin	%= solarSystem.ShipState.Engine.Scene->Graphics->Skins.size();
 				solarSystem.ShipState.Engine.Integrator.Centers[solarSystem.ShipState.Engine.GetRigidBody(solarSystem.ShipState.GetShipPartEntity(shipParts[iPart]))].Orientation = {0, 0, 0, 1};
 			}
 		}
@@ -458,8 +448,7 @@ static	::llc::error_t	modelsSetup			(::llc::SEngine & engine)			{
 }
 
 ::llc::error_t			ghg::solarSystemSetup	(::ghg::SGalaxyHell & solarSystem, const ::llc::n2u1_t & windowSize)	{
-	llc_necs(::modelsSetup(solarSystem.ShipState.Engine));
-	llc_necs(::modelsSetupOld(solarSystem.ShipState.Scene));
+	llc_necs(::modelsSetup(solarSystem.ShipState));
 
 	solarSystem.DecoState.FontManager.Fonts.clear();
 	llc_necs(::llc::rasterFontDefaults(solarSystem.DecoState.FontManager));

@@ -122,6 +122,7 @@ static	::llc::error_t	processSystemEvent		(::ghg::SGalaxyHellApp & app, const ::
 			llc_necs(::updateAllGuiMetrics(app, app.RenderTargetPool[0]->Color.View.metrics().u1()));
 
 		::llc::aobj<::llc::string>					fileNames					= {};
+#if GH_SAVE_ENABLED
 		::llc::pathList(app.SavegameFolder, fileNames, app.ExtensionSaveAuto);
 		if(fileNames.size()) {
 			if(failed(::ghg::solarSystemLoad(app.Game, fileNames[0]))) {
@@ -129,6 +130,7 @@ static	::llc::error_t	processSystemEvent		(::ghg::SGalaxyHellApp & app, const ::
 			}
 		}
 		fileNames					= {};
+#endif
 		::llc::pathList(app.SavegameFolder, fileNames, app.ExtensionProfile);
 		app.Players.resize(fileNames.size());
 

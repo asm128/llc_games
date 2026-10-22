@@ -340,6 +340,7 @@ namespace ghg
 		}
 
 		::llc::error_t					Save						(SAVE_MODE autosaveMode)				{
+#if GH_SAVE_ENABLED
 			sc_t								fileName[4096]				= {};
 			::llc::au0_t							b64PlayerName				= {};
 			for(uint32_t iPlayer = 0; iPlayer < Players.size(); ++iPlayer) {
@@ -364,6 +365,9 @@ namespace ghg
 			const int32_t						totalHealth					= Game.ShipState.SpaceshipManager.GetTeamHealth(0);
 			if(totalHealth > 0) // Save only if a player is alive
 				return ::ghg::solarSystemSave(Game, fileName);
+#else
+			(void)autosaveMode;
+#endif
 			return 0;
 		}
 	};

@@ -126,7 +126,9 @@ namespace ghg
 			return ShipControllers.resize(PlayState.Constants.Players);
 		}
 
+#if GH_SAVE_ENABLED
 		::llc::error_t						Save					(::llc::au0_t & output)		const	{
+			llc_necs(output.append({'L', 'G', 'H', '2'}));
 			llc_necs(::llc::savePOD(output, PlayState));
 			for(uint32_t iPlayer = 0; iPlayer < PlayState.Constants.Players; ++iPlayer) {
 				llc_necs(::llc::saveView(output, Pilots[iPlayer].Name));
@@ -139,6 +141,8 @@ namespace ghg
 
 		::llc::error_t						Load					(::llc::vcu0_t & input) {
 			::std::lock_guard						lock(LockUpdate);
+			if_true_vwf(-1, input.size() < 4 || memcmp(input.begin(), "LGH2", 4), "%s", "Unsupported Galaxy Hell save format.");
+			llc_necs(input.slice(input, 4));
 			::llc::view<const ::ghg::SPlayState>	readPlayState			= {};
 			llc_necs(::llc::loadPOD(input, PlayState));
 			llc_necs(Pilots.resize(PlayState.Constants.Players));
@@ -151,6 +155,7 @@ namespace ghg
 			llc_necs(ShipState.Load(input));
 			return 0;
 		}
+#endif
 	};
 
 	::llc::error_t		stageSetup				(::ghg::SGalaxyHell & solarSystem);
@@ -158,8 +163,10 @@ namespace ghg
 	::llc::error_t		solarSystemReset		(::ghg::SGalaxyHell & solarSystem); 
 	::llc::error_t		solarSystemDraw			(const ::ghg::SGalaxyHell & solarSystem, ::ghg::SGalaxyHellDrawCache & drawCache, ::std::mutex & lockUpdate);
 	::llc::error_t		solarSystemUpdate		(::ghg::SGalaxyHell & solarSystem, double secondsLastFrame, const ::llc::SInput & input, ::llc::vpobj<::llc::SEventSystem> frameEvents);
+#if GH_SAVE_ENABLED
 	::llc::error_t		solarSystemLoad			(::ghg::SGalaxyHell & world,::llc::vcst_t filename);
 	::llc::error_t		solarSystemSave			(const ::ghg::SGalaxyHell & world,::llc::vcst_t filename);
+#endif
 	
 	::llc::error_t		getLightArraysFromDebris
 		( const ::ghg::SDecoState	& decoState
@@ -195,4 +202,3 @@ namespace ghg
 }
 
 #endif // LLC_GALAXY_HELL_H_293874239874
-		  

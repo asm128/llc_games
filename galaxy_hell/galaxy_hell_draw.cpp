@@ -13,6 +13,22 @@ LLC_USING_TYPEINT();
 
 stxp	u2_t			MAX_LIGHT_RANGE		= 10;
 
+static ::llc::error_t drawShipTriangle
+	( ::llc::g8bgra targetPixels, const ::ghg::SShipGeometry & geometry, int iTriangle
+	, const ::llc::m4f2_t & matrixTransform, const ::llc::m4f2_t & matrixTransformVP, const ::llc::n3f2_t & lightVector
+	, ::llc::an2s1_t & pixelCoords, ::llc::apod<::llc::trif2_t> & pixelVertexWeights, ::llc::gc8bgra textureImage
+	, ::llc::an3f2_t & lightPoints, ::llc::a8bgra & lightColors, ::llc::gu2_t depthBuffer
+	, const ::llc::function<::llc::error_t(::llc::g8bgra, const ::llc::n2s1_t &, const ::llc::bgra &)> & funcSetPixel
+	) {
+	const ::llc::tri3f2_t & triangle = geometry.Triangles[iTriangle];
+	const ::llc::tri2f2_t & triangleTexCoords = geometry.TextureCoords[iTriangle];
+	const ::llc::n3f2_t & normal = geometry.Normals[iTriangle * 3];
+	::llc::drawQuadTriangle(targetPixels.metrics(), triangle, matrixTransformVP, pixelCoords, pixelVertexWeights, depthBuffer);
+	const ::llc::n3f2_t xnormal = matrixTransform.TransformDirection(normal).Normalize();
+	::llc::tri3f2_t triangleWorld = triangle;
+	::llc::transform(triangleWorld, matrixTransform);
+	return ::llc::drawPixels(targetPixels, triangleWorld, xnormal, triangleTexCoords, lightVector, pixelCoords, pixelVertexWeights, textureImage, lightPoints, lightColors, funcSetPixel);
+}
 static	::llc::error_t	drawStars			(const ::ghg::SStars & stars, ::llc::g8bgra targetPixels)	{
 	::llc::bgra					colors[]			=
 		{ {0xfF, 0xfF, 0xfF, }
@@ -170,11 +186,12 @@ static	::llc::error_t	drawCannonball
 	{
 		::llc::m4f2_t				matrixTransformVP			= matrixTransform * matrixVP;
 		::ghg::getLightArrays(matrixTransform.GetTranslation(), drawCache.LightPointsWorld, drawCache.LightColorsWorld, drawCache.LightPointsModel, drawCache.LightColorsModel);
-		const ::llc::SGeometryQuads	& mesh						= shipState.Scene.Geometry[::llc::SHIP_GEOMETRY_Sphere];
+		::ghg::SShipGeometry mesh;
+		llc_necs(shipState.GetGeometry(shipState.GetModelMesh(::llc::SHIP_GEOMETRY_Sphere), mesh));
 
 		for(uint32_t iTriangle = 0; iTriangle < mesh.Triangles.size(); ++iTriangle) {
 			::llc::clear(drawCache.PixelCoords, drawCache.PixelVertexWeights);
-			pixelsDrawn += ::llc::drawQuadTriangle(targetPixels, mesh, iTriangle, matrixTransform, matrixTransformVP, shipState.Scene.Global.LightVector, drawCache.PixelCoords, drawCache.PixelVertexWeights, image, drawCache.LightPointsModel, drawCache.LightColorsModel, depthBuffer
+			pixelsDrawn += ::drawShipTriangle(targetPixels, mesh, iTriangle, matrixTransform, matrixTransformVP, shipState.Scene.Global.LightVector, drawCache.PixelCoords, drawCache.PixelVertexWeights, image, drawCache.LightPointsModel, drawCache.LightColorsModel, depthBuffer
 				, [bulletColor, absanim](::llc::g8bgra targetPixels, const ::llc::n2s1_t & pixelCoord, const ::llc::bgra & color) {
 					targetPixels[pixelCoord.y][pixelCoord.x] = ::llc::interpolate_linear(::llc::rgbaf(color), bulletColor, absanim).Clamp(); 
 					return 0;
@@ -211,10 +228,11 @@ static	::llc::error_t	drawCannonball
 		matrixTransform.SetTranslation(position, false);
 		const ::llc::m4f2_t			matrixTransformVP			= matrixTransform * matrixVP;
 		::llc::clear(drawCache.LightPointsModel, drawCache.LightColorsModel);
-		const ::llc::SGeometryQuads	& mesh						= shipState.Scene.Geometry[::llc::SHIP_GEOMETRY_Cylinder];
+		::ghg::SShipGeometry mesh;
+		llc_necs(shipState.GetGeometry(shipState.GetModelMesh(::llc::SHIP_GEOMETRY_Cylinder), mesh));
 		for(uint32_t iTriangle = 0; iTriangle < mesh.Triangles.size(); ++iTriangle) {
 			::llc::clear(drawCache.PixelCoords, drawCache.PixelVertexWeights);
-			pixelsDrawn += ::llc::drawQuadTriangle(targetPixels, mesh, iTriangle, matrixTransform, matrixTransformVP, shipState.Scene.Global.LightVector, drawCache.PixelCoords, drawCache.PixelVertexWeights, image, drawCache.LightPointsModel, drawCache.LightColorsModel, depthBuffer
+			pixelsDrawn += ::drawShipTriangle(targetPixels, mesh, iTriangle, matrixTransform, matrixTransformVP, shipState.Scene.Global.LightVector, drawCache.PixelCoords, drawCache.PixelVertexWeights, image, drawCache.LightPointsModel, drawCache.LightColorsModel, depthBuffer
 				, [](::llc::g8bgra targetPixels, const ::llc::n2s1_t & pixelCoord, const ::llc::bgra & color) {
 					::llc::bgra			& tp						= targetPixels[pixelCoord.y][pixelCoord.x];
 					tp				= ::llc::interpolate_linear(color, tp, color.a / 255.0f); 
@@ -432,19 +450,21 @@ static	::llc::error_t	drawShots			(::llc::g8bgra targetPixels
 	double													absanim					= fabsf(sinf(animationTime * 3));
 	const ::llc::rgbaf								shadedColor				= (absanim < .5) ? ::llc::rgbaf{} : shipColor * (absanim * .5);
 	for(uint32_t iEntity = 0; iEntity < entityChildren.size(); ++iEntity) {
-		const ::ghg::SGHEntityVisual									& entityChild				= shipState.EntityVisuals[entityChildren[iEntity]];
+		const ::llc::SRenderNode									& entityChild				= shipState.GetNode(entityChildren[iEntity]);
 		if(::llc::EID_INVALID == shipState.Engine.Entities[entityChildren[iEntity]].Parent)
 			continue;
-		if(-1 == entityChild.Geometry)
+		if(shipState.Engine.Scene->RenderNodes.Flags[shipState.Engine.GetRenderNode(entityChildren[iEntity])].NoDraw)
 			continue;
-		const ::llc::m4f2_t							& matrixTransform				= shipState.Scene.Transforms[entityChild.Transform];
+		const ::llc::m4f2_t							& matrixTransform				= shipState.GetTransform(entityChildren[iEntity]);
 		::llc::m4f2_t									matrixTransformVP			= matrixTransform * matrixVP;
 		::ghg::getLightArrays(matrixTransform.GetTranslation(), drawCache.LightPointsWorld, drawCache.LightColorsWorld, drawCache.LightPointsModel, drawCache.LightColorsModel);
-		const ::llc::SGeometryQuads								& mesh						= shipState.Scene.Geometry[entityChild.Geometry];
-		const ::llc::gc8bgra					image						= shipState.Scene.Image	[entityChild.Image].View;
+		::ghg::SShipGeometry mesh;
+		llc_necs(shipState.GetGeometry(entityChild.Mesh, mesh));
+		::llc::gc8bgra image;
+		llc_necs(shipState.GetImage(shipState.Engine.Scene->Graphics->Skins[entityChild.Skin]->Textures[0], image));
 		for(uint32_t iTriangle = 0; iTriangle < mesh.Triangles.size(); ++iTriangle) {
 			::llc::clear(drawCache.PixelCoords, drawCache.PixelVertexWeights);
-			pixelsDrawn += ::llc::drawQuadTriangle(targetPixels, mesh, iTriangle, matrixTransform, matrixTransformVP, shipState.Scene.Global.LightVector, drawCache.PixelCoords, drawCache.PixelVertexWeights, image, drawCache.LightPointsModel, drawCache.LightColorsModel, depthBuffer
+			pixelsDrawn += ::drawShipTriangle(targetPixels, mesh, iTriangle, matrixTransform, matrixTransformVP, shipState.Scene.Global.LightVector, drawCache.PixelCoords, drawCache.PixelVertexWeights, image, drawCache.LightPointsModel, drawCache.LightColorsModel, depthBuffer
 				, [shadedColor](::llc::g8bgra targetPixels, const ::llc::n2s1_t & pixelCoord, const ::llc::bgra & color) {
 					//if( color.r > 64
 					// || color.g > 128
@@ -484,8 +504,7 @@ static	::llc::error_t	drawShip
 	if(iShip >= (int32_t)solarSystem.PlayState.Constants.Players || shipCore.Team)
 		return 0;
 
-	const ::ghg::SGHEntityVisual				& entity			= solarSystem.ShipState.EntityVisuals[solarSystem.ShipState.ShipCoreEntity[iShip]];
-	const ::llc::m4f2_t					& matrixTransform	= solarSystem.ShipState.Scene.Transforms[entity.Transform];
+	const ::llc::m4f2_t					& matrixTransform	= solarSystem.ShipState.GetTransform(solarSystem.ShipState.ShipCoreEntity[iShip]);
 	::llc::n3f2_t						starPos				= matrixTransform.GetTranslation() + ::llc::n3f2_t{0.0f, 8.0f, 0.0f};
 	starPos							= matrixVP.Transform(starPos);
 	starPos.x = ::llc::clamped(starPos.x, 20.0f, targetPixels.metrics().x - 20.0f);
@@ -515,8 +534,10 @@ static	::llc::error_t	drawExplosion
 	, ::llc::gu2_t					depthBuffer
 	, ::ghg::SGalaxyHellDrawCache	& drawCache
 	) {
-	::llc::gc8bgra						image				= solarSystem.ShipState.Scene.Image		[explosion.IndexImage].View;
-	const ::llc::SGeometryQuads			& mesh				= solarSystem.ShipState.Scene.Geometry	[explosion.IndexMesh];
+	::llc::gc8bgra image;
+	llc_necs(solarSystem.ShipState.GetImage(solarSystem.ShipState.Engine.Scene->Graphics->Skins[explosion.IndexImage]->Textures[0], image));
+	::ghg::SShipGeometry mesh;
+	llc_necs(solarSystem.ShipState.GetGeometry(explosion.IndexMesh, mesh));
 	for(uint32_t iExplosionPart = 0; iExplosionPart < explosion.Particles.Position.size(); ++iExplosionPart) {
 		const ::llc::rangeu1_t				& sliceMesh			= explosion.Slices[iExplosionPart];
 		::llc::m4f2_t						matrixPart			= {};
@@ -532,7 +553,7 @@ static	::llc::error_t	drawExplosion
 			drawCache.PixelVertexWeights	.clear();
 			const uint32_t						iActualTriangle		= sliceMesh.Offset + iTriangle;
 			::llc::tri3f2_t						triangleWorld		= mesh.Triangles	[iActualTriangle];
-			::llc::n3f2_t						normal				= mesh.Normals		[iActualTriangle / 2];
+			::llc::n3f2_t						normal				= mesh.Normals		[iActualTriangle * 3];
 			::llc::tri2f2_t						triangleTexCoords	= mesh.TextureCoords[iActualTriangle];
 			::llc::tri3f2_t						triangleScreen		= triangleWorld;
 			::llc::transform(triangleScreen, matrixTransformView);
