@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug-MT|Win32"><Configuration>Debug-MT</Configuration><Platform>Win32</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Debug-MT|x64"><Configuration>Debug-MT</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|Win32"><Configuration>Debug</Configuration><Platform>Win32</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release-MT|Win32"><Configuration>Release-MT</Configuration><Platform>Win32</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release-MT|x64"><Configuration>Release-MT</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32"><Configuration>Release</Configuration><Platform>Win32</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>18.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{2137191C-2CAE-425F-81D1-0646DC46F2E2}</ProjectGuid>
+    <RootNamespace>llc_gpftw_professional</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType Condition="'$(Configuration)'=='Debug' Or '$(Configuration)'=='Release'">Application</ConfigurationType>
+    <ConfigurationType Condition="'$(Configuration)'=='Debug-MT' Or '$(Configuration)'=='Release-MT'">DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug' Or '$(Configuration)'=='Debug-MT'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release' Or '$(Configuration)'=='Release-MT'">false</UseDebugLibraries>
+    <WholeProgramOptimization Condition="'$(Configuration)'=='Release' Or '$(Configuration)'=='Release-MT'">true</WholeProgramOptimization>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <PropertyGroup Label="UserMacros" />
+  <Import Project="..\llc_gpftw_projects.props" />
+  <ItemGroup>
+    <ClCompile Include="llc_gpftw_professional.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\llc_gpftw_port.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

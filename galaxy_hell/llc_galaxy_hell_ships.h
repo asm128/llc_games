@@ -18,6 +18,7 @@
 
 namespace ghg
 {
+	::llc::err_t psGalaxyHell(const ::llc::SEngineSceneConstants & constants, const ::llc::SPSIn & input, ::llc::bgra & output);
 	enum CAMERA_MODE
 		{ CAMERA_MODE_SKY			= 0
 		, CAMERA_MODE_PERSPECTIVE
@@ -132,8 +133,8 @@ namespace ghg
 			::llc::SShaderManager & shaders = Engine.Scene->Graphics->Shaders;
 			shaders = {};
 			llc_necs(shaders.Create());
-			if_null_fe(shaders[0].create(::llc::psTerrestrial));
-			shaders.Names[0] = "psTerrestrial";
+			if_null_fe(shaders[0].create(::ghg::psGalaxyHell));
+			shaders.Names[0] = "psGalaxyHell";
 			return 0;
 		}
 

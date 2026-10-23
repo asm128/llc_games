@@ -5,9 +5,12 @@
     <Filter Include="Header Files"><UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier><Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp</Extensions></Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="llc_sample_gui_components.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="llc_gontrill.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="llc_games.cpp"><Filter>Source Files</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="llc_sample_gui_components.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="llc_gontrill.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="llc_games.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="llc_tictactoe.h"><Filter>Header Files</Filter></ClInclude>
   </ItemGroup>
 </Project>

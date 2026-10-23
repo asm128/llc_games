@@ -225,7 +225,7 @@ static	::llc::error_t	processSystemEvent		(::ghg::SGalaxyHellApp & app, const ::
 	if(app.ActiveState < 2)
 		return 0;
 
-	::llc::pobj<::ghg::TRenderTarget>		target	= {};
+	::llc::pobj<::ghg::SGalaxyHellFrame>		target	= {};
 	{
 		::std::lock_guard			rtLock(app.RenderTargetLockPool);
 		if(app.RenderTargetPool.size()) {
@@ -242,13 +242,17 @@ static	::llc::error_t	processSystemEvent		(::ghg::SGalaxyHellApp & app, const ::
 	}
 
 	target->resize(renderTargetSize.u2(), {0, 0, 0, 1}, 0xFFFFFFFFU);
+	llc_necs(target->GUI.Clear());
+	bool gpuGUI;
+	{ ::std::lock_guard lock(app.Game.LockUpdate); gpuGUI = app.Game.DrawCache.UseGPU && bool(app.Game.DrawCache.DrawShips); }
+	const auto drawGUI = [&](::llc::SGUI & gui) { return gpuGUI ? ::llc::guiBuildMesh(gui, renderTargetSize.u2(), target->GUI) : ::llc::guiDraw(gui, target->Color.View); };
 
 	::llc::g8bgra							targetPixels			= target->Color.View;
 	::llc::grid<uint32_t>									depthBuffer				= target->DepthStencil.View;
 	switch(app.ActiveState) {
 	default					: 
 	case APP_STATE_Play		: 
-		::ghg::solarSystemDraw(app.Game, app.Game.DrawCache, app.Game.LockUpdate);
+		llc_necs(::ghg::solarSystemDraw(app.Game, app.Game.DrawCache, app.Game.LockUpdate));
 		::llc::pobj<::ghg::TRenderTarget>		sourceRT	= {};
 		sourceRT								= app.Game.DrawCache.RenderTarget;
 		if(!sourceRT)
@@ -285,19 +289,18 @@ static	::llc::error_t	processSystemEvent		(::ghg::SGalaxyHellApp & app, const ::
 
 	{
 		::std::lock_guard							lockUpdate			(app.Game.LockUpdate);
-		::llc::guiDraw(*app.DialogPerState[app.ActiveState].GUI, targetPixels);
+		llc_necs(drawGUI(*app.DialogPerState[app.ActiveState].GUI));
 	}
 	if(app.ActiveState != ::ghg::APP_STATE_Play) {
 		::std::lock_guard							lockUpdate			(app.Game.LockUpdate);
-		::llc::guiDraw(*app.DialogDesktop.GUI, targetPixels);
+		llc_necs(drawGUI(*app.DialogDesktop.GUI));
 	}
 	for(uint32_t iPlayer = 0; iPlayer < app.UIPlay.PlayerUI.size(); ++iPlayer) {
 		::std::lock_guard							lockUpdate			(app.Game.LockUpdate);
-		::llc::guiDraw((app.ActiveState == ::ghg::APP_STATE_Play)
+		llc_necs(drawGUI((app.ActiveState == ::ghg::APP_STATE_Play)
 			? *app.UIPlay.PlayerUI[iPlayer].DialogPlay.GUI
 			: *app.UIPlay.PlayerUI[iPlayer].DialogHome.GUI
-			, targetPixels
-		);
+			));
 	}
 	{
 		::std::lock_guard			rtLock(app.RenderTargetLockQueue);

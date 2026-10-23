@@ -3,7 +3,7 @@
 #include "llc_galaxy_hell_app.h"
 
 #include "llc_framework.h"
-#include "llc_engine_d3d_app.h"
+#include "llc_engine_gui_d3d.h"
 
 //#include "llc_udp_client_app.h"
 
@@ -21,6 +21,10 @@ struct SApplication {
 	::ghg::SGalaxyHellApp	GalaxyHellApp;
 
 	::llc::pobj<::llc::SD3DApplication> D3D;
+	::llc::SD3DRenderTarget	ShipTarget;
+	::llc::SD3DGUIMeshResources GUIMesh;
+	::llc::SD3DGUIResources<::llc::bgra> ShipLabel;
+	::llc::an2u1_t			LabelPixels;
 	bool					COMInitialized	= false;
  
 	//::llc::SClient		Client;

@@ -1,4 +1,5 @@
 #include "llc_galaxy_hell.h"
+#include "llc_engine_gui.h"
 #include "llc_dialog_controls.h"
 #include "llc_gui_control_list.h"
 #include "llc_deflate.h"
@@ -9,6 +10,8 @@
 
 namespace ghg
 {
+	struct SGalaxyHellFrame : TRenderTarget { ::llc::SGUIMesh GUI; };
+
 	GDEFINE_ENUM_TYPE (UI_HOME, uint8_t);
 	GDEFINE_ENUM_VALUE(UI_HOME, Continue		, 0);
 	GDEFINE_ENUM_VALUE(UI_HOME, Shop			, 1);
@@ -292,8 +295,8 @@ namespace ghg
 	GDEFINE_ENUM_VALUE(APP_STATE, COUNT		, 15);
 
 	struct SGalaxyHellApp {
-		::llc::apobj<TRenderTarget>			RenderTargetPool			= {};
-		::llc::apobj<TRenderTarget>			RenderTargetQueue			= {};
+		::llc::apobj<SGalaxyHellFrame>			RenderTargetPool			= {};
+		::llc::apobj<SGalaxyHellFrame>			RenderTargetQueue			= {};
 		::std::mutex						RenderTargetLockPool		= {};
 		::std::mutex						RenderTargetLockQueue		= {};
 		vltl	uint64_t					CurrentRenderTarget			= 0;

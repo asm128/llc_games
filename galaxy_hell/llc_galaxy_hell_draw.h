@@ -1,11 +1,14 @@
 #include "llc_img_color.h"
 #include "llc_array_ptr.h"
+#include "llc_functional.h"
+#include "llc_matrix3.h"
 
 #ifndef LLC_GALAXY_HELL_DRAW_H_293874239874
 #define LLC_GALAXY_HELL_DRAW_H_293874239874
 
 namespace ghg
 {
+	struct SGalaxyHell;
 
 	typedef ::llc::rt<::llc::bgra, ::llc::u2_t>			TRenderTarget;
 
@@ -30,6 +33,9 @@ namespace ghg
 		// Gameplay render target. I decided the world will have its own rendertarget to facilitate reuse of the code.
 		::llc::n2u1_t						RenderTargetMetrics		= {1280, 720};
 		::llc::pobj<::ghg::TRenderTarget>	RenderTarget			= {};
+		::llc::function<::llc::err_t(const ::ghg::SGalaxyHell &, ::ghg::SGalaxyHellDrawCache &, const ::llc::m4f2_t &)> DrawShips = {};
+		::llc::au2_t						ShipNodes				= {};
+		bool							UseGPU					= true;
 
 		::llc::error_t						Clear					() {
 			::llc::clear

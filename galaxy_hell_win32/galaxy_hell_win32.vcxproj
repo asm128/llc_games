@@ -178,6 +178,19 @@
     <ClCompile Include="galaxy_hell_win32.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="vsGalaxyHell.hlsl">
+      <ShaderType>Vertex</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(OutDir)%(Filename).cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="psGalaxyHell.hlsl">
+      <ShaderType>Pixel</ShaderType>
+      <ShaderModel>5.0</ShaderModel>
+      <ObjectFileOutput>$(OutDir)%(Filename).cso</ObjectFileOutput>
+    </FxCompile>
+    <None Include="GalaxyHellShader.hlsli" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="galaxy_hell_win32.h" />
   </ItemGroup>
   <ItemGroup>

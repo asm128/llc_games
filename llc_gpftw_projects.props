@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <OutDir>$(SolutionDir)../$(Platform).$(Configuration)/</OutDir>
+    <IntDir>$(SolutionDir)../obj/$(Platform).$(Configuration)/$(ProjectName)/</IntDir>
+    <GPFTWBuildDefine Condition="'$(Configuration)'=='Debug' Or '$(Configuration)'=='Debug-MT'">_DEBUG</GPFTWBuildDefine>
+    <GPFTWBuildDefine Condition="'$(Configuration)'=='Release' Or '$(Configuration)'=='Release-MT'">NDEBUG</GPFTWBuildDefine>
+    <GPFTWModuleDefine Condition="'$(Configuration)'=='Debug-MT' Or '$(Configuration)'=='Release-MT'">LLC_AVOID_LOCAL_APPLICATION_MODEL_EXECUTABLE_RUNTIME</GPFTWModuleDefine>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>$(GPFTWModuleDefine);$(GPFTWBuildDefine);_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(SolutionDir)../llc/llc;$(SolutionDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <UseStandardPreprocessor>true</UseStandardPreprocessor>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>llc.lib;user32.lib;gdi32.lib;d3d11.lib;dxgi.lib;d2d1.lib;dwrite.lib;windowscodecs.lib;ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
+      <ModuleDefinitionFile Condition="'$(Configuration)'=='Debug-MT' Or '$(Configuration)'=='Release-MT'">$(SolutionDir)../llc/llc/llc_module_exports.def</ModuleDefinitionFile>
+    </Link>
+    <Manifest>
+      <EnableSegmentHeap>true</EnableSegmentHeap>
+    </Manifest>
+  </ItemDefinitionGroup>
+</Project>

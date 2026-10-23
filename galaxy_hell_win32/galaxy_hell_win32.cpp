@@ -34,7 +34,99 @@
 
 LLC_DEFINE_APPLICATION_ENTRY_POINT(::SApplication, "Galaxy Hell v0.4");
 
-static ::llc::error_t presentFrame(SApplication & app, const ::ghg::TRenderTarget & frame) {
+static ::llc::err_t drawShipLabelGPU(SApplication & app, const ::ghg::SGalaxyHell & game, ::llc::u2_t iShip, const ::llc::m4f2_t & matrixVP, const ::llc::n2u2_t & targetMetrics) {
+	llc_necs(::ghg::getShipLabelCoords(game, iShip, matrixVP, targetMetrics, *game.DecoState.FontManager.Fonts[10], app.LabelPixels));
+	if(0 == app.LabelPixels.size())
+		return 0;
+	::llc::n2u1_t first = app.LabelPixels[0], last = first;
+	for(const ::llc::n2u1_t & pixel : app.LabelPixels) {
+		first.x = ::llc::min(first.x, pixel.x); first.y = ::llc::min(first.y, pixel.y);
+		last .x = ::llc::max(last .x, pixel.x); last .y = ::llc::max(last .y, pixel.y);
+	}
+	auto & resources = *app.D3D->DeviceResources;
+	auto & label = app.ShipLabel;
+	::llc::pcom<ID3D11Device> owner;
+	if(label.VertexBuffer) label.VertexBuffer->GetDevice(&owner);
+	if(owner.get() != resources.GetD3DDevice()) {
+		label.ReleaseDeviceResources();
+		llc_necs(label.CreateDeviceResources(resources.GetD3DDevice()));
+		D3D11_BLEND_DESC blend = {};
+		label.BlendState->GetDesc(&blend);
+		blend.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+		::llc::pcom<ID3D11BlendState> blendState;
+		llc_hrcall(resources.GetD3DDevice()->CreateBlendState(&blend, &blendState));
+		label.BlendState = blendState;
+	}
+	const ::llc::n2u2_t size = {::llc::max((::llc::u2_t)(last.x - first.x + 1), label.RenderTarget.metrics().x), ::llc::max((::llc::u2_t)(last.y - first.y + 1), label.RenderTarget.metrics().y)};
+	if(!label.Texture2D || label.RenderTarget.metrics() != size)
+		llc_necs(label.CreateSizeDependentResources(resources.GetD3DDevice(), size.u1()));
+	memset(label.RenderTarget.begin(), 0, label.RenderTarget.byte_count());
+	::llc::bgra color = game.Pilots[iShip].Color;
+	color.a = game.ShipState.SpaceshipManager.ShipCores[iShip].Health > 0 ? 255 : 51;
+	for(const ::llc::n2u1_t & pixel : app.LabelPixels)
+		label.RenderTarget[pixel.y - first.y][pixel.x - first.x] = color;
+	auto context = resources.GetD3DDeviceContext();
+	const D3D11_VIEWPORT viewport = {(float)first.x, (float)first.y, (float)size.x, (float)size.y, 0, 1};
+	context->RSSetViewports(1, &viewport);
+	const ::llc::err_t result = ::llc::d3dGUIDraw(resources, label);
+	const D3D11_VIEWPORT fullViewport = {0, 0, (float)targetMetrics.x, (float)targetMetrics.y, 0, 1};
+	context->RSSetViewports(1, &fullViewport);
+	return result;
+}
+
+static ::llc::err_t drawShipsGPU(SApplication & app, const ::ghg::SGalaxyHell & game, ::ghg::SGalaxyHellDrawCache & cache, const ::llc::m4f2_t & matrixVP) {
+	::std::lock_guard lockRender(app.LockRender);
+	::llc::SD3DApplication & d3d = *app.D3D;
+	::llc::Sample3DSceneRenderer & renderer = d3d.Scene;
+	const ::llc::SEngineScene & scene = *game.ShipState.Engine.Scene;
+	const ::llc::SEngineGraphics & graphics = *scene.Graphics;
+	if(renderer.VertexBuffer.size() != graphics.Meshes.size() || renderer.ShaderResourceView.size() != graphics.Surfaces.size() || renderer.PixelShader.size() != graphics.Shaders.size()) {
+		renderer.IndexBuffer.clear(); renderer.VertexBuffer.clear();
+		renderer.ShaderResourceView.clear(); renderer.PixelShader.clear(); renderer.LightSlots.clear();
+		llc_necs(d3d.CreateDeviceDependentEngineResources(d3d.DeviceResources->GetD3DDevice(), graphics));
+	}
+	if(renderer.VertexShader.size() == 1)
+		llc_necs(renderer.CreateVertexShader("vsGalaxyHell"));
+	::llc::g8bgra colors = cache.RenderTarget->Color;
+	::llc::gu2_t depth = cache.RenderTarget->DepthStencil;
+	llc_necs(app.ShipTarget.Begin(*d3d.DeviceResources, colors));
+	::llc::SEngineSceneConstants & constants = renderer.ConstantBufferScene;
+	constants = {};
+	constants.View.Identity();
+	constants.Screen.ViewportLH(colors.metrics().u1());
+	constants.Perspective = matrixVP * constants.Screen.GetInverse();
+	constants.LightDirection = game.ShipState.Scene.Global.LightVector;
+	constants.Time = (::llc::f2_t)game.DecoState.AnimationTime;
+	llc_necs(scene.BuildLightList(renderer.RenderCache.LightsWorld));
+	for(::llc::u2_t iLight = 0; iLight < cache.LightPointsWorld.size(); ++iLight) {
+		::llc::SRenderLight light;
+		light.Position = cache.LightPointsWorld[iLight];
+		light.Color.Diffuse = cache.LightColorsWorld[iLight];
+		light.Range = 10;
+		llc_necs(renderer.RenderCache.LightsWorld.push_back(light));
+	}
+	const double pulse = fabsf(sinf((float)game.DecoState.AnimationTime * 3));
+	for(::llc::u2_t iShip = 0; iShip < game.ShipState.SpaceshipManager.ShipCores.size(); ++iShip) {
+		const ::llc::SSpaceshipCore & ship = game.ShipState.SpaceshipManager.ShipCores[iShip];
+		if(ship.Health <= 0 && ship.Team)
+			continue;
+		const ::llc::rgbaf color = iShip < game.PlayState.Constants.Players ? ::llc::bgra(game.Pilots[iShip].Color) : ::llc::bgra(::llc::RED);
+		const ::llc::rgbaf emission = pulse < .5 ? ::llc::rgbaf{} : color * (pulse * .5);
+		llc_necs(::ghg::getShipRenderNodes(game, iShip, cache.ShipNodes));
+		for(::llc::u2_t node : cache.ShipNodes) {
+			::llc::SRenderMaterial material = graphics.Skins[scene.RenderNodes[node].Skin]->Material;
+			material.Emission = {emission.r, emission.g, emission.b};
+			llc_necs(::llc::d3dDrawEngineNode(renderer, scene, node, renderer.RenderCache.LightsWorld, &material, 1));
+		}
+		if(iShip < game.PlayState.Constants.Players && !ship.Team) {
+			llc_necs(::drawShipLabelGPU(app, game, iShip, matrixVP, colors.metrics()));
+		}
+	}
+	return app.ShipTarget.Read(*d3d.DeviceResources, colors, depth);
+}
+
+static ::llc::error_t presentFrame(SApplication & app, const ::ghg::SGalaxyHellFrame & frame) {
+	::std::lock_guard lockRender(app.LockRender);
 	const ::llc::SWindow & window = app.Framework.RootWindow;
 	if(window.NoDraw || 0 == window.Size.x || 0 == window.Size.y || frame.Color.metrics() != window.Size.u2())
 		return 0;
@@ -53,6 +145,7 @@ static ::llc::error_t presentFrame(SApplication & app, const ::ghg::TRenderTarge
 	const ::llc::rgbaf clear = {0, 0, 0, 1};
 	context->ClearRenderTargetView(target, &clear.r);
 	llc_necs(::llc::d3dGUIDraw(resources, d3d.GUIStuff));
+	llc_necs(::llc::d3dGUIDraw(resources, app.GUIMesh, frame.GUI, frame.Color.metrics()));
 	return resources.Present();
 }
 
@@ -102,6 +195,10 @@ static	::llc::error_t	processSystemEvent	(::SApplication & app, const ::llc::SEv
 	app.AudioState.CleanupAudio(); 
 
 	if(app.D3D) {
+		app.GalaxyHellApp.Game.DrawCache.DrawShips = {};
+		app.ShipLabel = {};
+		app.GUIMesh = {};
+		app.ShipTarget = {};
 		if(app.D3D->DeviceResources && app.D3D->DeviceResources->m_swapChain)
 			if_fail_e(app.D3D->Shutdown());
 		app.D3D = {};
@@ -239,6 +336,7 @@ bool ParseCommandLine( const sc_t *pchCmdLine, const sc_t **ppchServerAddress, c
 	llc_necs(app.D3D->Initialize(mainWindow.PlatformDetail.WindowHandle, app.GalaxyHellApp.Game.ShipState.Engine.Scene->Graphics));
 	llc_necs(app.D3D->CreateDeviceResources(*app.GalaxyHellApp.Game.ShipState.Engine.Scene->Graphics));
 	llc_necs(app.D3D->SetWindowSize(mainWindow.Size));
+	drawCache.DrawShips = [&app](const ::ghg::SGalaxyHell & game, ::ghg::SGalaxyHellDrawCache & cache, const ::llc::m4f2_t & matrixVP) { return ::drawShipsGPU(app, game, cache, matrixVP); };
 
 	return 0;
 }
@@ -254,7 +352,7 @@ bool ParseCommandLine( const sc_t *pchCmdLine, const sc_t **ppchServerAddress, c
 
 	if_true_vi(::llc::APPLICATION_STATE_EXIT, 1 == ::ghg::galaxyHellUpdate(app.GalaxyHellApp, framework.FrameInfo.Seconds.LastFrame, mainWindow.Input, mainWindow.EventQueue));
 
-	::llc::pobj<::ghg::TRenderTarget> frame;
+	::llc::pobj<::ghg::SGalaxyHellFrame> frame;
 	{
 		::std::lock_guard			lockRTQueue	(app.GalaxyHellApp.RenderTargetLockQueue);
 		if(app.GalaxyHellApp.RenderTargetQueue.size()) {

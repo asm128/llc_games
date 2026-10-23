@@ -307,7 +307,11 @@ static	::llc::error_t	guiSetupPlay		(::ghg::SGalaxyHellApp & app, ::llc::SDialog
 }
 
 static	::llc::error_t	guiSetupAbout		(::ghg::SGalaxyHellApp & app, ::llc::SDialog & dialog) { return ::llc::guiCreateControlList<::ghg::UI_CREDITS>(*dialog.GUI, -1, 160, int16_t(-20 * ::llc::get_value_count<::ghg::UI_CREDITS>() / 2), ::llc::ALIGN_CENTER, ::llc::ALIGN_CENTER, app.DialogControls[::ghg::APP_STATE_About]); }
-static	::llc::error_t	guiSetupSettings	(::ghg::SGalaxyHellApp & app, ::llc::SDialog & dialog) { return ::llc::guiCreateControlList<::ghg::UI_SETTINGS>(*dialog.GUI, -1, {160,20}, {}, ::llc::ALIGN_CENTER, ::llc::ALIGN_CENTER, app.DialogControls[::ghg::APP_STATE_Settings]); }
+static	::llc::error_t	guiSetupSettings	(::ghg::SGalaxyHellApp & app, ::llc::SDialog & dialog) {
+	llc_necs(::llc::guiCreateControlList<::ghg::UI_SETTINGS>(*dialog.GUI, -1, {160,20}, {}, ::llc::ALIGN_CENTER, ::llc::ALIGN_CENTER, app.DialogControls[::ghg::APP_STATE_Settings]));
+	const auto & cache = app.Game.DrawCache;
+	return ::llc::controlTextSet(*dialog.GUI, app.DialogControls[::ghg::APP_STATE_Settings][::ghg::UI_SETTINGS_Graphics], cache.UseGPU && cache.DrawShips ? ::llc::vcst_t{"Graphics: D3D11"} : ::llc::vcst_t{"Graphics: CPU"});
+}
 
 ::llc::error_t			ghg::guiSetup		(::ghg::SGalaxyHellApp & app, const ::llc::pobj<::llc::SInput> & input) {
 	if_true_e(failed(::dialogCreateCommon(app.DialogDesktop, input, {})));
@@ -447,12 +451,14 @@ static	::llc::error_t	guiHandleWelcome	(::ghg::SGalaxyHellApp & app, ::llc::SGUI
 	}
 	return ::ghg::APP_STATE_Welcome; 
 }
-static	::llc::error_t	guiHandleSetup		(::llc::SGUI & /*gui*/, uint32_t idControl, ::ghg::SGalaxyHell & /*game*/) { 
+static	::llc::error_t	guiHandleSetup		(::ghg::SGalaxyHellApp & app, ::llc::SGUI & gui, uint32_t idControl, ::ghg::SGalaxyHell & game) {
 	if(idControl == (uint32_t)::ghg::UI_SETTINGS_Audio) {
 		return ::ghg::APP_STATE_Home;
 	}
 	else if(idControl == (uint32_t)::ghg::UI_SETTINGS_Graphics) {
-		return ::ghg::APP_STATE_Home;
+		::std::lock_guard lockUpdate(game.LockUpdate);
+		game.DrawCache.UseGPU = game.DrawCache.DrawShips && !game.DrawCache.UseGPU;
+		llc_necs(::llc::controlTextSet(gui, app.DialogControls[::ghg::APP_STATE_Settings][::ghg::UI_SETTINGS_Graphics], game.DrawCache.UseGPU ? ::llc::vcst_t{"Graphics: D3D11"} : ::llc::vcst_t{"Graphics: CPU"}));
 	}
 	else if(idControl == (uint32_t)::ghg::UI_SETTINGS_Back) {
 		return ::ghg::APP_STATE_Home;
@@ -756,7 +762,7 @@ static	::llc::error_t	guiUpdateHome				(::ghg::SGalaxyHellApp & app, ::llc::vpob
 			case ::ghg::APP_STATE_Load		: return appState = (::ghg::APP_STATE)::guiHandleLoad		(app, gui, idControl, game);
 			case ::ghg::APP_STATE_Profile	: return appState = (::ghg::APP_STATE)::guiHandleUser		(gui, idControl, game);
 			case ::ghg::APP_STATE_Shop		: return appState = (::ghg::APP_STATE)::guiHandleShop		(gui, idControl, game);
-			case ::ghg::APP_STATE_Settings	: return appState = (::ghg::APP_STATE)::guiHandleSetup		(gui, idControl, game);
+			case ::ghg::APP_STATE_Settings	: return appState = (::ghg::APP_STATE)::guiHandleSetup		(app, gui, idControl, game);
 			case ::ghg::APP_STATE_About		: return appState = (::ghg::APP_STATE)::guiHandleAbout		(gui, idControl, game);
 			}
 			return appState;

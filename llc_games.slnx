@@ -25,4 +25,13 @@
     <BuildDependency Project="../llc/llc_engine/llc_engine.vcxproj" />
     <BuildDependency Project="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" />
   </Project>
+  <Project Path="llc_gpftw/llc_gpftw.vcxproj" Id="899f38a0-571f-48ae-a213-a35421177510">
+    <BuildDependency Project="../llc/llc/llc.vcxproj" />
+  </Project>
+  <Project Path="llc_gpftw_advanced/llc_gpftw_advanced.vcxproj" Id="03d31ff9-363b-4403-a148-7958618846af">
+    <BuildDependency Project="../llc/llc/llc.vcxproj" />
+  </Project>
+  <Project Path="llc_gpftw_professional/llc_gpftw_professional.vcxproj" Id="2137191c-2cae-425f-81d1-0646dc46f2e2">
+    <BuildDependency Project="../llc/llc/llc.vcxproj" />
+  </Project>
 </Solution>

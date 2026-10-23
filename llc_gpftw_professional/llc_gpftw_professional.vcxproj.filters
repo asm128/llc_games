@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files"><UniqueIdentifier>{2137191C-2CAE-425F-81D1-0646DC46F2E2}</UniqueIdentifier><Extensions>cpp;c;cxx</Extensions></Filter>
+    <Filter Include="Header Files"><UniqueIdentifier>{2137191C-2CAE-425F-81D1-0646DC46F2E3}</UniqueIdentifier><Extensions>h;hpp</Extensions></Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="llc_gpftw_professional.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClInclude Include="..\llc_gpftw_port.h"><Filter>Header Files</Filter></ClInclude>
+  </ItemGroup>
+</Project>

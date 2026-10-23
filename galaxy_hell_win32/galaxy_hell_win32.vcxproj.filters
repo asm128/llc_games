@@ -26,5 +26,10 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="GalaxyHellShader.hlsli"><Filter>Header Files</Filter></None>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="vsGalaxyHell.hlsl"><Filter>Source Files</Filter></FxCompile>
+    <FxCompile Include="psGalaxyHell.hlsl"><Filter>Source Files</Filter></FxCompile>
   </ItemGroup>
 </Project>

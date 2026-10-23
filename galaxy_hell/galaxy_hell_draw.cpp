@@ -13,6 +13,48 @@ LLC_USING_TYPEINT();
 
 stxp	u2_t			MAX_LIGHT_RANGE		= 10;
 
+::llc::err_t ghg::psGalaxyHell(const ::llc::SEngineSceneConstants & constants, const ::llc::SPSIn & input, ::llc::bgra & output) {
+	if_true_fe(input.Surfaces.size() == 0 || input.Surfaces[0].size() == 0);
+	const ::llc::gc8bgra image = input.Surfaces[0];
+	const ::llc::n2f2_t unit = {image.metrics().x - .000001f, image.metrics().y - .000001f};
+	const ::llc::rgbaf texel = image[(::llc::u2_t)(input.WeightedUV.y * unit.y) % image.metrics().y][(::llc::u2_t)(input.WeightedUV.x * unit.x) % image.metrics().x];
+	const ::llc::rgbaf ambient = input.Lights.size() ? texel / (10.0 * input.Lights.size()) : ::llc::rgbaf{};
+	::llc::rgbaf accumulated = {};
+	for(const ::llc::SRenderLight & light : input.Lights) {
+		const ::llc::n3f2_t offset = light.Position - input.WeightedPosition;
+		const double distance = offset.LengthSquared();
+		const double rangeSquared = light.Range * (double)light.Range;
+		if(rangeSquared <= 0 || distance > rangeSquared)
+			continue;
+		accumulated += ambient;
+		if(offset.Dot(input.WeightedNormal) <= 0)
+			continue;
+		accumulated += (texel * light.Color.Diffuse) * ::llc::max(0.0, 1.0 - distance / rangeSquared);
+	}
+	const double directional = input.WeightedNormal.Dot(constants.LightDirection);
+	const ::llc::bgra shaded = (texel * .2 + (texel * directional).Clamp() + accumulated.Clamp()).Clamp();
+	const ::llc::n3f2_t & emission = input.Material.Emission;
+	output = (::llc::rgbaf(shaded) + ::llc::rgbaf{emission.x, emission.y, emission.z, 0}).Clamp();
+	return 0;
+}
+
+::llc::err_t ghg::getShipRenderNodes(const ::ghg::SGalaxyHell & game, ::llc::u2_t ship, ::llc::au2_t & nodes) {
+	nodes.clear();
+	const auto & state = game.ShipState;
+	for(::llc::u1_t part : state.SpaceshipManager.ShipParts[ship]) {
+		if(state.SpaceshipManager.Orbiters[part].Health.Value <= 0)
+			continue;
+		for(::llc::eid_t entity : state.Engine.Entities.GetChildren(state.ShipPartEntity[part])) {
+			if(state.Engine.Entities[entity].Parent == ::llc::EID_INVALID)
+				continue;
+			const ::llc::u2_t node = state.Engine.GetRenderNode(entity);
+			if(!state.Engine.Scene->RenderNodes.Flags[node].NoDraw)
+				llc_necs(nodes.push_back(node));
+		}
+	}
+	return 0;
+}
+
 static ::llc::error_t drawShipTriangle
 	( ::llc::g8bgra targetPixels, const ::ghg::SShipGeometry & geometry, int iTriangle
 	, const ::llc::m4f2_t & matrixTransform, const ::llc::m4f2_t & matrixTransformVP, const ::llc::n3f2_t & lightVector
@@ -489,8 +531,6 @@ static	::llc::error_t	drawShip
 	, ::ghg::SGalaxyHellDrawCache	& drawCache
 	, const ::llc::SRasterFont		& font
 	) {
-	const ::llc::SSpaceshipCore				& shipCore			= solarSystem.ShipState.SpaceshipManager.ShipCores[iShip];
-
 	uint32_t							pixelsDrawn			= 0;
 	const ::llc::bgra					playerColor			= ((uint32_t)iShip < solarSystem.PlayState.Constants.Players) ? ::llc::bgra(solarSystem.Pilots[iShip].Color) : ::llc::bgra(::llc::RED);
 	const ::llc::vcu1_t					shipParts			= solarSystem.ShipState.SpaceshipManager.ShipParts[iShip];
@@ -501,29 +541,44 @@ static	::llc::error_t	drawShip
 		pixelsDrawn += ::ghg::drawOrbiter(solarSystem.ShipState, solarSystem.ShipState.ShipPartEntity[shipParts[iPart]], playerColor, (float)solarSystem.DecoState.AnimationTime, matrixVP, targetPixels, depthBuffer, drawCache);
 	}
 
+	llc_necs(::ghg::drawShipLabel(solarSystem, iShip, matrixVP, targetPixels, font));
+	return pixelsDrawn;
+}
+
+::llc::err_t ghg::getShipLabelCoords(const ::ghg::SGalaxyHell & solarSystem, ::llc::s2_t iShip, const ::llc::m4f2_t & matrixVP, const ::llc::n2u2_t & targetMetrics, const ::llc::SRasterFont & font, ::llc::an2u1_t & dstCoords) {
+	dstCoords.clear();
+	const ::llc::SSpaceshipCore & shipCore = solarSystem.ShipState.SpaceshipManager.ShipCores[iShip];
 	if(iShip >= (int32_t)solarSystem.PlayState.Constants.Players || shipCore.Team)
 		return 0;
 
 	const ::llc::m4f2_t					& matrixTransform	= solarSystem.ShipState.GetTransform(solarSystem.ShipState.ShipCoreEntity[iShip]);
 	::llc::n3f2_t						starPos				= matrixTransform.GetTranslation() + ::llc::n3f2_t{0.0f, 8.0f, 0.0f};
 	starPos							= matrixVP.Transform(starPos);
-	starPos.x = ::llc::clamped(starPos.x, 20.0f, targetPixels.metrics().x - 20.0f);
-	starPos.y = ::llc::clamped(starPos.y, 20.0f, targetPixels.metrics().y - 20.0f);
+	starPos.x = ::llc::clamped(starPos.x, 20.0f, targetMetrics.x - 20.0f);
+	starPos.y = ::llc::clamped(starPos.y, 20.0f, targetMetrics.y - 20.0f);
 	const ::llc::n2<int32_t>			pixelCoord			= {(int32_t)starPos.x, (int32_t)starPos.y};
 
 	const ::llc::vcs					finalText			= solarSystem.Pilots[iShip].Name;
 	::llc::rect2s1_t						rectText			= {{}, {int16_t(font.CharSize.x * finalText.size()), font.CharSize.y}};
 	rectText.Offset = (pixelCoord - ::llc::n2s2_t{(rectText.Size.x >> 1), (rectText.Size.y >> 1)}).s1();
 
-	::llc::an2u1_t						dstCoords;
-	llc_necs(::llc::textLineRaster(targetPixels.metrics(), font.CharSize, rectText, font.Texture, finalText, dstCoords));
+	return ::llc::textLineRaster(targetMetrics, font.CharSize, rectText, font.Texture, finalText, dstCoords);
+}
+
+::llc::err_t ghg::drawShipLabel(const ::ghg::SGalaxyHell & solarSystem, ::llc::s2_t iShip, const ::llc::m4f2_t & matrixVP, ::llc::g8bgra targetPixels, const ::llc::SRasterFont & font) {
+	::llc::an2u1_t dstCoords;
+	llc_necs(::ghg::getShipLabelCoords(solarSystem, iShip, matrixVP, targetPixels.metrics(), font, dstCoords));
+	if(0 == dstCoords.size())
+		return 0;
+	const ::llc::SSpaceshipCore & shipCore = solarSystem.ShipState.SpaceshipManager.ShipCores[iShip];
+	const ::llc::bgra playerColor = solarSystem.Pilots[iShip].Color;
 	for(uint32_t iCoord = 0; iCoord < dstCoords.size(); ++iCoord) {
 		const ::llc::n2u1_t					dstCoord			= dstCoords[iCoord];
 		if(::llc::in_range(dstCoord, {{}, targetPixels.metrics().u1()})) {
 			::llc::setPixel(targetPixels, dstCoord.s1(), (shipCore.Health > 0) ? playerColor : ::llc::bgra(::llc::interpolate_linear(::llc::rgbaf(playerColor), ::llc::rgbaf(targetPixels[dstCoord.y][dstCoord.x]), .8f)));
 		}
 	}
-	return pixelsDrawn;
+	return 0;
 }
 
 static	::llc::error_t	drawExplosion
@@ -611,6 +666,9 @@ static	::llc::error_t	drawExplosion
 	drawCache.LightColorsModel.reserve(drawCache.LightColorsWorld.size());
 	{
 		::std::lock_guard		lockUpdate					(mutexUpdate);
+		if(drawCache.UseGPU && drawCache.DrawShips)
+			llc_necs(drawCache.DrawShips(solarSystem, drawCache, matrixView));
+		else
 		for(uint32_t iShip = 0; iShip < solarSystem.ShipState.SpaceshipManager.ShipCores.size(); ++iShip) {
 			const ::llc::SSpaceshipCore	& ship						= solarSystem.ShipState.SpaceshipManager.ShipCores[iShip];
 			if(ship.Health <= 0 && ship.Team)

@@ -1,61 +1,38 @@
-#include "llc_engine.h"
+#include "llc_gui.h"
 #include "llc_window.h"
-#include "llc_gui_inputbox.h"
-#include "llc_gui_viewport.h"
-#include "llc_minmax.h"
+#include "llc_tictactoe.h"
+#include "llc_gontrill.h"
 
 #ifndef LLC_GAMES_H_23627
 #define LLC_GAMES_H_23627
 
-stxp ::llc::u0_t SAMPLE_GUI_COMPONENTS_COUNT = 3;
+enum GAMES_SCREEN : ::llc::u0_t { GAMES_SCREEN_MENU, GAMES_SCREEN_TICTACTOE, GAMES_SCREEN_GONTRILL };
 
-stct SSampleCheckBox {
-	::llc::cid_t		IdControl	= ::llc::CID_INVALID;
-	bool			Checked		= false;
+stct SLLCGames {
+	::llc::SWindow			& Window;
+	::llc::SGUI				& GUI;
+	::llc::TicTacToe		Game			= {};
+	::llc::SGontrill		Gontrill		= {};
+	::llc::cid_t			Title			= ::llc::CID_INVALID;
+	::llc::cid_t			Play			= ::llc::CID_INVALID;
+	::llc::cid_t			PlayGontrill	= ::llc::CID_INVALID;
+	::llc::cid_t			Exit			= ::llc::CID_INVALID;
+	::llc::cid_t			Status			= ::llc::CID_INVALID;
+	::llc::cid_t			Restart			= ::llc::CID_INVALID;
+	::llc::cid_t			Back			= ::llc::CID_INVALID;
+	::llc::astatic<::llc::cid_t, 9>
+						Cells			= {};
+	::llc::cid_t			GontrillHud		= ::llc::CID_INVALID;
+	::llc::cid_t			GontrillHelp	= ::llc::CID_INVALID;
+	::llc::cid_t			GontrillBack	= ::llc::CID_INVALID;
+	char					GontrillHudText[160] = {};
+	GAMES_SCREEN			Screen			= GAMES_SCREEN_MENU;
+
+	SLLCGames(::llc::SWindow & window, ::llc::SGUI & gui) : Window(window), GUI(gui) {}
 };
 
-stct SSampleSlider {
-	::llc::cid_t		IdRoot		= ::llc::CID_INVALID;
-	::llc::cid_t		IdThumb		= ::llc::CID_INVALID;
-	::llc::minmaxs3_t	ValueLimits	= {0, 100};
-	::llc::s3_t		ValueCurrent	= 0;
-	::llc::s3_t		ValueStep	= 1;
-	::llc::s3_t		ValuePage	= 10;
-	bool			Vertical	= false;
-	::llc::astchar<64>	ValueText	= {};
-};
+::llc::err_t	gamesSetup	(SLLCGames & app);
+::llc::err_t	gamesUpdate	(SLLCGames & app, ::llc::f2_t secondsLastFrame);
+::llc::err_t	gamesDraw	(SLLCGames & app, ::llc::g8bgra target);
 
-stct SSampleGUIComponents {
-	::llc::SEngine		Engine			= {};
-	::llc::SWindow		& Window;
-	::llc::SGUI			& GUI;
-	::llc::cid_t			Desktop			= ::llc::CID_INVALID;
-	::llc::cid_t			Help			= ::llc::CID_INVALID;
-	::llc::cid_t			Performance		= ::llc::CID_INVALID;
-	::llc::astchar<96>		PerformanceText	= {};
-	::llc::cid_t			ComponentsPanel	= ::llc::CID_INVALID;
-	::llc::cid_t			ControlEdit		= ::llc::CID_INVALID;
-	::llc::cid_t			ControlExit		= ::llc::CID_INVALID;
-	SSampleCheckBox		CheckBox			= {};
-	SSampleSlider		SliderHorizontal	= {};
-	SSampleSlider		SliderVertical		= {};
-	::llc::SInputBox		InputBox			= {};
-	::llc::n2s1_t			InputBoxDragOrigin	= {};
-	bool					InputBoxDragging	= false;
-	bool					InputBoxDragCanceled	= false;
-	::llc::acid			ControlsKeyboard	= {};
-	::llc::astatic<::llc::SViewport, SAMPLE_GUI_COMPONENTS_COUNT>
-						Viewports		= {};
-	::llc::astatic<::llc::n2s1_t, SAMPLE_GUI_COMPONENTS_COUNT>
-						UnfoldedSize		= {};
-	::llc::astatic<bool, SAMPLE_GUI_COMPONENTS_COUNT>
-						Folded			= {};
-
-	SSampleGUIComponents(::llc::SWindow & window, ::llc::SGUI & gui) : Window(window), GUI(gui) {}
-};
-
-::llc::err_t	sampleGUIComponentsSetup				(SSampleGUIComponents & app);
-::llc::err_t	sampleGUIComponentsUpdate				(SSampleGUIComponents & app, bool systemRequestedExit, double secondsLastFrame);
-::llc::err_t	sampleGUIComponentsDraw					(SSampleGUIComponents & app, ::llc::img8bgra (&clientImages)[SAMPLE_GUI_COMPONENTS_COUNT], ::llc::u2_t frameIndex, ::llc::g8bgra target);
-
-#endif // LLC_GAME_H_23627
+#endif // LLC_GAMES_H_23627

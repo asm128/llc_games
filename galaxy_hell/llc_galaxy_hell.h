@@ -159,6 +159,9 @@ namespace ghg
 	};
 
 	::llc::error_t		stageSetup				(::ghg::SGalaxyHell & solarSystem);
+	::llc::err_t			getShipRenderNodes		(const ::ghg::SGalaxyHell & game, ::llc::u2_t ship, ::llc::au2_t & nodes);
+	::llc::err_t			getShipLabelCoords		(const ::ghg::SGalaxyHell & game, ::llc::s2_t ship, const ::llc::m4f2_t & matrixVP, const ::llc::n2u2_t & targetMetrics, const ::llc::SRasterFont & font, ::llc::an2u1_t & coords);
+	::llc::err_t			drawShipLabel			(const ::ghg::SGalaxyHell & game, ::llc::s2_t ship, const ::llc::m4f2_t & matrixVP, ::llc::g8bgra target, const ::llc::SRasterFont & font);
 	::llc::error_t		solarSystemSetup		(::ghg::SGalaxyHell & solarSystem, const ::llc::n2u1_t & windowSize);
 	::llc::error_t		solarSystemReset		(::ghg::SGalaxyHell & solarSystem); 
 	::llc::error_t		solarSystemDraw			(const ::ghg::SGalaxyHell & solarSystem, ::ghg::SGalaxyHellDrawCache & drawCache, ::std::mutex & lockUpdate);
