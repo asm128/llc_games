@@ -3,6 +3,7 @@
 #include "llc_galaxy_hell_app.h"
 
 #include "llc_framework.h"
+#include "llc_engine_d3d_app.h"
 
 //#include "llc_udp_client_app.h"
 
@@ -19,8 +20,8 @@ struct SApplication {
 
 	::ghg::SGalaxyHellApp	GalaxyHellApp;
 
-	HDC						DrawingContext	= {};
-	HGLRC					GLRenderContext	= {}; 
+	::llc::pobj<::llc::SD3DApplication> D3D;
+	bool					COMInitialized	= false;
  
 	//::llc::SClient		Client;
 

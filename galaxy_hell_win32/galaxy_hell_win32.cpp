@@ -34,6 +34,28 @@
 
 LLC_DEFINE_APPLICATION_ENTRY_POINT(::SApplication, "Galaxy Hell v0.4");
 
+static ::llc::error_t presentFrame(SApplication & app, const ::ghg::TRenderTarget & frame) {
+	const ::llc::SWindow & window = app.Framework.RootWindow;
+	if(window.NoDraw || 0 == window.Size.x || 0 == window.Size.y || frame.Color.metrics() != window.Size.u2())
+		return 0;
+	::llc::SD3DApplication & d3d = *app.D3D;
+	if(d3d.GUIStuff.RenderTarget.metrics() != window.Size.u2())
+		llc_necs(d3d.SetWindowSize(window.Size));
+	memcpy(d3d.GUIStuff.RenderTarget.begin(), frame.Color.begin(), frame.Color.byte_count());
+	for(auto & pixel : d3d.GUIStuff.RenderTarget.Texels)
+		pixel.a = 255; // Only the upload copy is opaque; the completed CPU frame is unchanged.
+	auto & resources = *d3d.DeviceResources;
+	auto context = resources.GetD3DDeviceContext();
+	ID3D11RenderTargetView * target = resources.GetBackBufferRenderTargetView();
+	context->OMSetRenderTargets(1, &target, resources.GetDepthStencilView());
+	const D3D11_VIEWPORT viewport = resources.GetScreenViewport();
+	context->RSSetViewports(1, &viewport);
+	const ::llc::rgbaf clear = {0, 0, 0, 1};
+	context->ClearRenderTargetView(target, &clear.r);
+	llc_necs(::llc::d3dGUIDraw(resources, d3d.GUIStuff));
+	return resources.Present();
+}
+
 static	::llc::error_t	processScreenEvent		(::SApplication & /*app*/, const ::llc::SEventView<::llc::EVENT_SCREEN> & screenEvent) { 
 	switch(screenEvent.Type) {
 	default: break;
@@ -79,11 +101,14 @@ static	::llc::error_t	processSystemEvent	(::SApplication & app, const ::llc::SEv
 	::ghg::galaxyHellUpdate(app.GalaxyHellApp, framework.FrameInfo.Seconds.LastFrame, framework.RootWindow.Input, mainWindow.EventQueue);
 	app.AudioState.CleanupAudio(); 
 
-	// --- when the rendering context is no longer needed ...   
- 	// make the rendering context not current  
-	if(app.GLRenderContext) {
-		wglMakeCurrent		(NULL, NULL) ; 
-		wglDeleteContext	(app.GLRenderContext);	// delete the rendering context  
+	if(app.D3D) {
+		if(app.D3D->DeviceResources && app.D3D->DeviceResources->m_swapChain)
+			if_fail_e(app.D3D->Shutdown());
+		app.D3D = {};
+	}
+	if(app.COMInitialized) {
+		::CoUninitialize();
+		app.COMInitialized = false;
 	}
 #ifdef USE_STEAM_CLIENT
 	SteamAPI_Shutdown();
@@ -206,15 +231,14 @@ bool ParseCommandLine( const sc_t *pchCmdLine, const sc_t **ppchServerAddress, c
 	//	app.GamePad.Resume();
 
 
-	// create a rendering context  
-	app.DrawingContext		= GetDC(framework.RootWindow.PlatformDetail.WindowHandle);
-	app.GLRenderContext		= wglCreateContext(app.DrawingContext); 
- 
-	// make it the calling thread's current rendering context 
-	wglMakeCurrent (app.DrawingContext, app.GLRenderContext);
- 
-	// call OpenGL APIs as desired ... 
- 
+	const HRESULT result = ::CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+	if(result != RPC_E_CHANGED_MODE) {
+		if_true_fef(FAILED(result), "CoInitializeEx failed: 0x%08X.", (::llc::u2_t)result);
+		app.COMInitialized = true;
+	}
+	llc_necs(app.D3D->Initialize(mainWindow.PlatformDetail.WindowHandle, app.GalaxyHellApp.Game.ShipState.Engine.Scene->Graphics));
+	llc_necs(app.D3D->CreateDeviceResources(*app.GalaxyHellApp.Game.ShipState.Engine.Scene->Graphics));
+	llc_necs(app.D3D->SetWindowSize(mainWindow.Size));
 
 	return 0;
 }
@@ -230,19 +254,27 @@ bool ParseCommandLine( const sc_t *pchCmdLine, const sc_t **ppchServerAddress, c
 
 	if_true_vi(::llc::APPLICATION_STATE_EXIT, 1 == ::ghg::galaxyHellUpdate(app.GalaxyHellApp, framework.FrameInfo.Seconds.LastFrame, mainWindow.Input, mainWindow.EventQueue));
 
+	::llc::pobj<::ghg::TRenderTarget> frame;
 	{
 		::std::lock_guard			lockRTQueue	(app.GalaxyHellApp.RenderTargetLockQueue);
 		if(app.GalaxyHellApp.RenderTargetQueue.size()) {
 			::std::lock_guard			lockRTPool	(app.GalaxyHellApp.RenderTargetLockPool);
 
-			app.GalaxyHellApp.RenderTargetPool.push_back(app.Framework.RootWindow.BackBuffer);
-			app.Framework.RootWindow.BackBuffer		= app.GalaxyHellApp.RenderTargetQueue[app.GalaxyHellApp.RenderTargetQueue.size() - 1];
+			frame				= app.GalaxyHellApp.RenderTargetQueue[app.GalaxyHellApp.RenderTargetQueue.size() - 1];
 			app.GalaxyHellApp.RenderTargetQueue.pop_back();
 			for(uint32_t iRT = 0; iRT < app.GalaxyHellApp.RenderTargetQueue.size(); ++iRT) {
 				app.GalaxyHellApp.RenderTargetPool.push_back(app.GalaxyHellApp.RenderTargetQueue[iRT]);
 			}
 			app.GalaxyHellApp.RenderTargetQueue.clear();
 		}
+	}
+	if(frame) {
+		const ::llc::error_t result = ::presentFrame(app, *frame);
+		{
+			::std::lock_guard lockRTPool(app.GalaxyHellApp.RenderTargetLockPool);
+			llc_necs(app.GalaxyHellApp.RenderTargetPool.push_back(frame));
+		}
+		llc_necs(result);
 	}
 	app.AudioState.vListenerPos			= app.GalaxyHellApp.Game.ShipState.Scene.Global.Camera[app.GalaxyHellApp.Game.ShipState.Scene.Global.CameraMode].Position; 
 	app.AudioState.listener.OrientTop	= {0, 1, 0}; 

@@ -109,7 +109,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OutDir); ../../steamworks_sdk_155/redistributable_bin/win64; ../../steamworks_sdk_155/public/steam/lib/win64</AdditionalLibraryDirectories>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
-      <AdditionalDependencies>galaxy_hell.lib; llc_engine.lib; llc.lib; zlibvc.lib; user32.lib; gdi32.lib; shcore.lib; winmm.lib; xaudio2.lib; comctl32.lib; ole32.lib; dxguid.lib; comctl32.lib; Opengl32.lib;</AdditionalDependencies>
+      <AdditionalDependencies>galaxy_hell.lib; llc_engine.lib; llc.lib; zlibvc.lib; user32.lib; gdi32.lib; shcore.lib; winmm.lib; xaudio2.lib; comctl32.lib; ole32.lib; dxguid.lib; comctl32.lib; d3d11.lib; dxgi.lib; d2d1.lib; dwrite.lib; windowscodecs.lib;</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -131,7 +131,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OutDir); ../../steamworks_sdk_155/redistributable_bin/win64; ../../steamworks_sdk_155/public/steam/lib/win64</AdditionalLibraryDirectories>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
-      <AdditionalDependencies>galaxy_hell.lib; llc_engine.lib; llc.lib; zlibvc.lib; user32.lib; gdi32.lib; shcore.lib; winmm.lib; xaudio2.lib; comctl32.lib; ole32.lib; dxguid.lib; comctl32.lib; Opengl32.lib;</AdditionalDependencies>
+      <AdditionalDependencies>galaxy_hell.lib; llc_engine.lib; llc.lib; zlibvc.lib; user32.lib; gdi32.lib; shcore.lib; winmm.lib; xaudio2.lib; comctl32.lib; ole32.lib; dxguid.lib; comctl32.lib; d3d11.lib; dxgi.lib; d2d1.lib; dwrite.lib; windowscodecs.lib;</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -149,7 +149,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OutDir); ../../steamworks_sdk_155/redistributable_bin/win64; ../../steamworks_sdk_155/public/steam/lib/win64</AdditionalLibraryDirectories>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
-      <AdditionalDependencies>galaxy_hell.lib; llc_engine.lib; llc.lib; zlibvc.lib; user32.lib; gdi32.lib; shcore.lib; winmm.lib; xaudio2.lib; comctl32.lib; ole32.lib; dxguid.lib; comctl32.lib; Opengl32.lib;</AdditionalDependencies>
+      <AdditionalDependencies>galaxy_hell.lib; llc_engine.lib; llc.lib; zlibvc.lib; user32.lib; gdi32.lib; shcore.lib; winmm.lib; xaudio2.lib; comctl32.lib; ole32.lib; dxguid.lib; comctl32.lib; d3d11.lib; dxgi.lib; d2d1.lib; dwrite.lib; windowscodecs.lib;</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -171,7 +171,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OutDir); ../../steamworks_sdk_155/redistributable_bin/win64; ../../steamworks_sdk_155/public/steam/lib/win64</AdditionalLibraryDirectories>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
-      <AdditionalDependencies>galaxy_hell.lib; llc_engine.lib; llc.lib; zlibvc.lib; user32.lib; gdi32.lib; shcore.lib; winmm.lib; xaudio2.lib; comctl32.lib; ole32.lib; dxguid.lib; comctl32.lib; Opengl32.lib;</AdditionalDependencies>
+      <AdditionalDependencies>galaxy_hell.lib; llc_engine.lib; llc.lib; zlibvc.lib; user32.lib; gdi32.lib; shcore.lib; winmm.lib; xaudio2.lib; comctl32.lib; ole32.lib; dxguid.lib; comctl32.lib; d3d11.lib; dxgi.lib; d2d1.lib; dwrite.lib; windowscodecs.lib;</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
