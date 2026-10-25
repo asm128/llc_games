@@ -3,7 +3,7 @@
 #include "llc_galaxy_hell_app.h"
 
 #include "llc_framework.h"
-#include "llc_engine_gui_d3d.h"
+#include "llc_engine_d3d_app.h"
 
 //#include "llc_udp_client_app.h"
 
@@ -12,6 +12,12 @@
 
 struct SApplication {
 	::llc::SFramework		Framework;
+	::llc::SFrameMeter		DebugFrames;
+	::llc::cid_t			DebugHUD		= -1;
+	::llc::sc_t			DebugHUDText[128] = {};
+	::llc::cid_t			DebugPanel		= -1, DebugHelp = -1, DebugStatus = -1;
+	::llc::acid			DebugControls;
+	::llc::sc_t			DebugStatusText[96] = {};
 
 	::std::mutex			LockGUI;
 	::std::mutex			LockRender;
@@ -22,7 +28,7 @@ struct SApplication {
 
 	::llc::pobj<::llc::SD3DApplication> D3D;
 	::llc::SD3DRenderTarget	ShipTarget;
-	::llc::SD3DGUIMeshResources GUIMesh;
+	::llc::pcom<ID3D11GeometryShader> FragmentClip;
 	::llc::SD3DGUIResources<::llc::bgra> ShipLabel;
 	::llc::an2u1_t			LabelPixels;
 	bool					COMInitialized	= false;

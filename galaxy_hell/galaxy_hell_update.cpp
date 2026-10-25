@@ -192,7 +192,8 @@ static	::llc::error_t	updateShots				(::ghg::SGalaxyHell & solarSystem, double s
 static	::llc::error_t	updateDistancesToTargets	(::ghg::SGalaxyHell & solarSystem, int32_t team, int32_t iShipPart, ::llc::papod<::llc::n3f2_t> & orbiterDistancesToTargets, ::llc::SShots & shots)	{
 	{
 		::std::lock_guard			lockUpdate					(solarSystem.LockUpdate);
-		orbiterDistancesToTargets.clear();
+		if(orbiterDistancesToTargets)
+			orbiterDistancesToTargets->clear();
 		for(uint32_t iShot = 0; iShot < shots.Particles.Position.size(); ++iShot)
 			shots.DistanceToTargets[iShot].clear();
 	}
@@ -461,7 +462,7 @@ stacxpr	const double	UPDATE_STEP_TIME			= 0.012;
 	::llc::n2u1_t				targetMetrics				= {}; 
 	targetMetrics			= solarSystem.DrawCache.RenderTargetMetrics;
 
-	double						secondsToProcess			= ::llc::min(actualSecondsLastFrame, 0.15);
+	double						secondsToProcess			= ::llc::min(actualSecondsLastFrame, 0.15) * solarSystem.CustomTimeScale;
 	for(uint32_t iShip = 0; iShip < solarSystem.ShipState.SpaceshipManager.ShipCores.size(); ++iShip) {
 		::llc::au1_t					& shipParts					= solarSystem.ShipState.SpaceshipManager.ShipParts[iShip];
 		const uint32_t				iBody						= solarSystem.ShipState.Engine.GetRigidBody(solarSystem.ShipState.ShipCoreEntity[iShip]);

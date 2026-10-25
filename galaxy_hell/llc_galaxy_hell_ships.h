@@ -19,6 +19,7 @@
 namespace ghg
 {
 	::llc::err_t psGalaxyHell(const ::llc::SEngineSceneConstants & constants, const ::llc::SPSIn & input, ::llc::bgra & output);
+	::llc::err_t psGalaxyHellFragment(const ::llc::SEngineSceneConstants & constants, const ::llc::SPSIn & input, ::llc::bgra & output);
 	enum CAMERA_MODE
 		{ CAMERA_MODE_SKY			= 0
 		, CAMERA_MODE_PERSPECTIVE
@@ -135,6 +136,9 @@ namespace ghg
 			llc_necs(shaders.Create());
 			if_null_fe(shaders[0].create(::ghg::psGalaxyHell));
 			shaders.Names[0] = "psGalaxyHell";
+			llc_necs(shaders.Create());
+			if_null_fe(shaders[1].create(::ghg::psGalaxyHellFragment));
+			shaders.Names[1] = "psGalaxyHellFragment";
 			return 0;
 		}
 

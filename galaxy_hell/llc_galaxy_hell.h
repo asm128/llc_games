@@ -106,6 +106,7 @@ namespace ghg
 		::ghg::SShipManager					ShipState				= {};
 		::ghg::SDecoState					DecoState				= {};	
 		::ghg::SPlayState					PlayState				= {};
+		::llc::f3_t						CustomTimeScale			= 1;
 		::llc::aobj<::ghg::SShipPilot>		Pilots					= {};
 		::llc::apod<::ghg::SShipController>	ShipControllers			= {};
 

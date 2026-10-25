@@ -451,14 +451,22 @@ static	::llc::error_t	guiHandleWelcome	(::ghg::SGalaxyHellApp & app, ::llc::SGUI
 	}
 	return ::ghg::APP_STATE_Welcome; 
 }
-static	::llc::error_t	guiHandleSetup		(::ghg::SGalaxyHellApp & app, ::llc::SGUI & gui, uint32_t idControl, ::ghg::SGalaxyHell & game) {
+::llc::err_t ghg::galaxyHellToggleRenderer(::ghg::SGalaxyHellApp & app) {
+	::std::lock_guard lockUpdate(app.Game.LockUpdate);
+	auto & cache = app.Game.DrawCache;
+	cache.UseGPU = cache.DrawShips && !cache.UseGPU;
+	const auto & controls = app.DialogControls[::ghg::APP_STATE_Settings];
+	if(controls.size() > ::ghg::UI_SETTINGS_Graphics)
+		llc_necs(::llc::controlTextSet(*app.DialogPerState[::ghg::APP_STATE_Settings].GUI, controls[::ghg::UI_SETTINGS_Graphics], cache.UseGPU ? ::llc::vcst_t{"Graphics: D3D11"} : ::llc::vcst_t{"Graphics: CPU"}));
+	return 0;
+}
+
+static	::llc::error_t	guiHandleSetup		(::ghg::SGalaxyHellApp & app, ::llc::SGUI & /*gui*/, uint32_t idControl, ::ghg::SGalaxyHell & /*game*/) {
 	if(idControl == (uint32_t)::ghg::UI_SETTINGS_Audio) {
 		return ::ghg::APP_STATE_Home;
 	}
 	else if(idControl == (uint32_t)::ghg::UI_SETTINGS_Graphics) {
-		::std::lock_guard lockUpdate(game.LockUpdate);
-		game.DrawCache.UseGPU = game.DrawCache.DrawShips && !game.DrawCache.UseGPU;
-		llc_necs(::llc::controlTextSet(gui, app.DialogControls[::ghg::APP_STATE_Settings][::ghg::UI_SETTINGS_Graphics], game.DrawCache.UseGPU ? ::llc::vcst_t{"Graphics: D3D11"} : ::llc::vcst_t{"Graphics: CPU"}));
+		llc_necs(::ghg::galaxyHellToggleRenderer(app));
 	}
 	else if(idControl == (uint32_t)::ghg::UI_SETTINGS_Back) {
 		return ::ghg::APP_STATE_Home;

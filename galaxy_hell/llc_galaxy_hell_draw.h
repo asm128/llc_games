@@ -23,6 +23,7 @@ namespace ghg
 		// Used when rastering triangles
 		::llc::apod<::llc::n2s1_t>			PixelCoords				;
 		::llc::apod<::llc::trif2_t>			PixelVertexWeights		;
+		::llc::apod<::llc::n3f2_t>			ShotPixelCoords			;
 		
 		// Used for pixel shading
 		::llc::apod<::llc::n3f2_t>			LightPointsWorld		;
@@ -41,6 +42,7 @@ namespace ghg
 			::llc::clear
 				( PixelCoords
 				, PixelVertexWeights		
+				, ShotPixelCoords
 				, LightPointsWorld		
 				, LightColorsWorld		
 				, LightPointsModel		

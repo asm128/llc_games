@@ -13,7 +13,7 @@ LLC_USING_TYPEINT();
 
 stxp	u2_t			MAX_LIGHT_RANGE		= 10;
 
-::llc::err_t ghg::psGalaxyHell(const ::llc::SEngineSceneConstants & constants, const ::llc::SPSIn & input, ::llc::bgra & output) {
+::llc::err_t ghg::psGalaxyHellFragment(const ::llc::SEngineSceneConstants & constants, const ::llc::SPSIn & input, ::llc::bgra & output) {
 	if_true_fe(input.Surfaces.size() == 0 || input.Surfaces[0].size() == 0);
 	const ::llc::gc8bgra image = input.Surfaces[0];
 	const ::llc::n2f2_t unit = {image.metrics().x - .000001f, image.metrics().y - .000001f};
@@ -32,7 +32,13 @@ stxp	u2_t			MAX_LIGHT_RANGE		= 10;
 		accumulated += (texel * light.Color.Diffuse) * ::llc::max(0.0, 1.0 - distance / rangeSquared);
 	}
 	const double directional = input.WeightedNormal.Dot(constants.LightDirection);
-	const ::llc::bgra shaded = (texel * .2 + (texel * directional).Clamp() + accumulated.Clamp()).Clamp();
+	output = (texel * .2 + (texel * directional).Clamp() + accumulated.Clamp()).Clamp();
+	return 0;
+}
+
+::llc::err_t ghg::psGalaxyHell(const ::llc::SEngineSceneConstants & constants, const ::llc::SPSIn & input, ::llc::bgra & output) {
+	::llc::bgra shaded;
+	llc_necs(::ghg::psGalaxyHellFragment(constants, input, shaded));
 	const ::llc::n3f2_t & emission = input.Material.Emission;
 	output = (::llc::rgbaf(shaded) + ::llc::rgbaf{emission.x, emission.y, emission.z, 0}).Clamp();
 	return 0;
@@ -293,7 +299,7 @@ static	::llc::error_t	drawShots			(::llc::g8bgra targetPixels
 	, const ::llc::SSpaceshipCore		& shipCore
 	, const ::llc::SWeapon			& weapon
 	, ::llc::grid<uint32_t>		depthBuffer
-	, ::llc::apod<::llc::n3f2_t>		pixelCoordsCache
+	, ::llc::apod<::llc::n3f2_t>		& pixelCoordsCache
 	, ::ghg::SGalaxyHellDrawCache	& drawCache
 	) {
 	::llc::rgbaf				colorShot				= ::llc::WHITE;
@@ -680,6 +686,7 @@ static	::llc::error_t	drawExplosion
 
 	{
 		::std::lock_guard		lockUpdate					(mutexUpdate);
+		if(!(drawCache.UseGPU && drawCache.DrawShips))
 		for(uint32_t iExplosion = 0; iExplosion < solarSystem.DecoState.Explosions.size(); ++iExplosion) {
 			const ::ghg::SExplosion	& explosion					= solarSystem.DecoState.Explosions[iExplosion];
 			if(0 == explosion.Slices.size())
@@ -703,7 +710,7 @@ static	::llc::error_t	drawExplosion
 			for(uint32_t iPart = 0; iPart < shipParts.size(); ++iPart) {
 				const ::llc::SSpaceshipOrbiter	& orbiter			= solarSystem.ShipState.SpaceshipManager.Orbiters[shipParts[iPart]];
 				const ::llc::SWeapon	& weapon			= solarSystem.ShipState.WeaponManager.Weapons[orbiter.Weapon];
-				::drawShots(targetPixels, solarSystem.ShipState, solarSystem.ShipState.WeaponManager.Shots[orbiter.Weapon], matrixView, (float)solarSystem.DecoState.AnimationTime, shipCore, weapon, depthBuffer, drawCache.LightPointsModel, drawCache);
+				::drawShots(targetPixels, solarSystem.ShipState, solarSystem.ShipState.WeaponManager.Shots[orbiter.Weapon], matrixView, (float)solarSystem.DecoState.AnimationTime, shipCore, weapon, depthBuffer, drawCache.ShotPixelCoords, drawCache);
 
 			}
 		}

@@ -16,31 +16,31 @@
   <Project Path="../llc/llc_test_core/llc_test_core.vcxproj" Id="6ac63b34-f2af-481d-9f2f-d7336a272638">
     <BuildDependency Project="../llc/llc/llc.vcxproj" />
     <BuildDependency Project="../llc/llc_test_module/llc_test_module.vcxproj" />
-    <BuildDependency Project="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" />
   </Project>
   <Project Path="../llc/llc_test_module/llc_test_module.vcxproj" Id="d0cda2a4-f7af-4cbb-a43b-4b92d37e3e10">
     <BuildDependency Project="../llc/llc/llc.vcxproj" />
-    <BuildDependency Project="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" />
+    <BuildDependency Project="../llc/lrt/lrt.vcxproj" />
   </Project>
-  <Project Path="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" Id="8fd826f8-3739-44e6-8cc8-997122e53b8d" />
   <Project Path="galaxy_hell/galaxy_hell.vcxproj" Id="6bcc32c5-95c9-4d90-8cb9-e29b2da2bfc2">
     <BuildType Solution="Debug-MT|*" Project="Debug" />
     <BuildType Solution="Release-MT|*" Project="Release" />
   </Project>
   <Project Path="galaxy_hell_win32/galaxy_hell_win32.vcxproj" Id="0716fffd-c2c0-4b75-bc84-ccf18c2a1c5e">
     <BuildDependency Project="../llc/llc_engine/llc_engine.vcxproj" />
+    <BuildDependency Project="../llc/lrt/lrt.vcxproj" />
     <BuildDependency Project="galaxy_hell/galaxy_hell.vcxproj" />
     <BuildType Solution="Debug-MT|*" Project="Debug" />
     <BuildType Solution="Release-MT|*" Project="Release" />
   </Project>
   <Project DefaultStartup="true" Path="llc_games_editor/llc_games_editor.vcxproj" Id="fe662981-1458-4a89-9c5c-cd3eda3c427e">
     <BuildDependency Project="../llc/llc/llc.vcxproj" />
+    <BuildDependency Project="../llc/llc_engine/llc_engine.vcxproj" />
     <BuildDependency Project="../llc/lrt/lrt.vcxproj" />
   </Project>
   <Project Path="llc_games/llc_games.vcxproj" Id="b33a66ba-1154-405f-8066-07c9048c5bec">
     <BuildDependency Project="../llc/llc/llc.vcxproj" />
     <BuildDependency Project="../llc/llc_engine/llc_engine.vcxproj" />
-    <BuildDependency Project="../zlib/contrib/vstudio/vc14/zlibvc.vcxproj" />
+    <BuildDependency Project="../llc/lrt/lrt.vcxproj" />
   </Project>
   <Project Path="llc_gpftw/llc_gpftw.vcxproj" Id="899f38a0-571f-48ae-a213-a35421177510">
     <BuildDependency Project="../llc/llc/llc.vcxproj" />

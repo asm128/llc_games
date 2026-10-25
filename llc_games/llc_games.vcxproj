@@ -159,7 +159,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>llc.lib; llc_engine.lib; zlibvc.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; dwrite.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
+      <AdditionalDependencies>llc.lib; llc_engine.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
       <ModuleDefinitionFile>$(SolutionDir)../llc/llc/llc_module_exports.def</ModuleDefinitionFile>
     </Link>
@@ -182,7 +182,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>llc.lib; llc_engine.lib; zlibvc.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; dwrite.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
+      <AdditionalDependencies>llc.lib; llc_engine.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
       <ModuleDefinitionFile>$(SolutionDir)../llc/llc/llc_module_exports.def</ModuleDefinitionFile>
     </Link>
@@ -206,7 +206,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>llc.lib; llc_engine.lib; zlibvc.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; dwrite.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
+      <AdditionalDependencies>llc.lib; llc_engine.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <Manifest>
@@ -230,7 +230,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>llc.lib; llc_engine.lib; zlibvc.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; dwrite.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
+      <AdditionalDependencies>llc.lib; llc_engine.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
       <ModuleDefinitionFile>$(SolutionDir)../llc/llc/llc_module_exports.def</ModuleDefinitionFile>
     </Link>
@@ -255,7 +255,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>llc.lib; llc_engine.lib; zlibvc.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; dwrite.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
+      <AdditionalDependencies>llc.lib; llc_engine.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
       <ModuleDefinitionFile>$(SolutionDir)../llc/llc/llc_module_exports.def</ModuleDefinitionFile>
     </Link>
@@ -281,7 +281,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>llc.lib; llc_engine.lib; zlibvc.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; dwrite.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
+      <AdditionalDependencies>llc.lib; llc_engine.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <Manifest>
@@ -304,7 +304,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>llc.lib; llc_engine.lib; zlibvc.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; dwrite.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
+      <AdditionalDependencies>llc.lib; llc_engine.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <Manifest>
@@ -329,7 +329,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>llc.lib; llc_engine.lib; zlibvc.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; dwrite.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
+      <AdditionalDependencies>llc.lib; llc_engine.lib; user32.lib; gdi32.lib; d3d11.lib; dxgi.lib; d2d1.lib; windowscodecs.lib; ole32.lib;</AdditionalDependencies>
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
     </Link>
     <Manifest>

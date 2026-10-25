@@ -3,6 +3,8 @@
 #include "llc_png.h"
 #include "llc_grid_copy.h"
 #include "llc_raster_lh.h"
+#include "llc_system_key.h"
+#include "llc_mutex.h"
 
 #include <time.h>
 #include <direct.h>
@@ -74,6 +76,57 @@ static ::llc::err_t drawShipLabelGPU(SApplication & app, const ::ghg::SGalaxyHel
 	return result;
 }
 
+static ::llc::err_t drawExplosionGPU(::llc::Sample3DSceneRenderer & renderer, const ::ghg::SGalaxyHell & game, const ::ghg::SExplosion & explosion) {
+	if(0 == explosion.Slices.size()) return 0;
+	const ::llc::SEngineGraphics & graphics = *game.ShipState.Engine.Scene->Graphics;
+	if_true_fe((::llc::u2_t)explosion.IndexMesh >= graphics.Meshes.size() || (::llc::u2_t)explosion.IndexImage >= graphics.Skins.size());
+	if_true_fe(explosion.Slices.size() != explosion.Particles.Position.size());
+	const ::llc::SGeometryMesh & mesh = *graphics.Meshes[explosion.IndexMesh];
+	const ::llc::SSkin & skin = *graphics.Skins[explosion.IndexImage];
+	if_true_fe(0 == mesh.GeometryBuffers.size());
+	const auto & indices = *graphics.Buffers[mesh.GeometryBuffers[0]];
+	const ::llc::u2_t indexCount = indices.Data.size() / indices.Desc.Format.TotalBytes();
+	::llc::s2_t shader;
+	llc_necs(shader = graphics.Shaders.Names.find("psGalaxyHellFragment"));
+	for(::llc::u2_t iPart = 0; iPart < explosion.Particles.Position.size(); ++iPart) {
+		const ::llc::rangeu2_t slice = {explosion.Slices[iPart].Offset * 3U, explosion.Slices[iPart].Count * 3U};
+		if_true_fe(slice.Offset > indexCount || slice.Count > indexCount - slice.Offset);
+		if(0 == slice.Count) continue;
+		::llc::SRenderNodeConstants constants;
+		constants.Model.Identity();
+		if(iPart % 5) constants.Model.RotationY(game.DecoState.AnimationTime * 2);
+		if(iPart % 3) constants.Model.RotationX(game.DecoState.AnimationTime * 2);
+		if(iPart % 2) constants.Model.RotationZ(game.DecoState.AnimationTime * 2);
+		constants.Model.SetTranslation(explosion.Particles.Position[iPart], false);
+		llc_necs(::llc::lightFilter(constants.Model.GetTranslation(), renderer.RenderCache.LightsWorld, renderer.RenderCache.LightsNode));
+		constants.MVP = (constants.Model * renderer.ConstantBufferScene.View * renderer.ConstantBufferScene.Perspective).GetTranspose();
+		constants.Model = constants.Model.GetTranspose();
+		llc_necs(renderer.Render(explosion.IndexMesh, slice, skin.Textures, shader, false, constants, renderer.RenderCache.LightsNode, 1, ::llc::CULL_MODE_NONE));
+	}
+	return 0;
+}
+
+static ::llc::err_t drawExplosionsGPU(SApplication & app, const ::ghg::SGalaxyHell & game) {
+	if(0 == game.DecoState.Explosions.size()) return 0;
+	auto device = app.D3D->DeviceResources->GetD3DDevice();
+	::llc::pcom<ID3D11Device> owner;
+	if(app.FragmentClip) app.FragmentClip->GetDevice(&owner);
+	if(owner.get() != device) {
+		::llc::au0_t code;
+		llc_necs(::llc::fileToMemory("gsGalaxyHellFragment.cso", code));
+		::llc::pcom<ID3D11GeometryShader> shader;
+		llc_hrcall(device->CreateGeometryShader(code.begin(), code.size(), nullptr, &shader));
+		app.FragmentClip = shader;
+	}
+	auto context = app.D3D->DeviceResources->GetD3DDeviceContext();
+	context->GSSetShader(app.FragmentClip, nullptr, 0);
+	::llc::err_t result = 0;
+	for(const ::ghg::SExplosion & explosion : game.DecoState.Explosions)
+		if(::llc::failed(result = ::drawExplosionGPU(app.D3D->Scene, game, explosion))) break;
+	context->GSSetShader(nullptr, nullptr, 0);
+	return result;
+}
+
 static ::llc::err_t drawShipsGPU(SApplication & app, const ::ghg::SGalaxyHell & game, ::ghg::SGalaxyHellDrawCache & cache, const ::llc::m4f2_t & matrixVP) {
 	::std::lock_guard lockRender(app.LockRender);
 	::llc::SD3DApplication & d3d = *app.D3D;
@@ -122,10 +175,131 @@ static ::llc::err_t drawShipsGPU(SApplication & app, const ::ghg::SGalaxyHell & 
 			llc_necs(::drawShipLabelGPU(app, game, iShip, matrixVP, colors.metrics()));
 		}
 	}
+	llc_necs(::drawExplosionsGPU(app, game));
 	return app.ShipTarget.Read(*d3d.DeviceResources, colors, depth);
 }
 
-static ::llc::error_t presentFrame(SApplication & app, const ::ghg::SGalaxyHellFrame & frame) {
+GDEFINE_ENUM_TYPE(DEBUG_CONTROL, ::llc::u0_t);
+GDEFINE_ENUM_VALUED(DEBUG_CONTROL, Help,     0, "F1   Help");
+GDEFINE_ENUM_VALUED(DEBUG_CONTROL, Panel,    1, "F2   Close controls");
+GDEFINE_ENUM_VALUED(DEBUG_CONTROL, HUD,      2, "F3   Show / hide HUD");
+GDEFINE_ENUM_VALUED(DEBUG_CONTROL, Renderer, 3, "F4   Switch CPU / D3D11");
+GDEFINE_ENUM_VALUED(DEBUG_CONTROL, Pause,    4, "P    Pause / resume");
+GDEFINE_ENUM_VALUED(DEBUG_CONTROL, Slower,   5, "F6   Slower");
+GDEFINE_ENUM_VALUED(DEBUG_CONTROL, Faster,   6, "F7   Faster");
+GDEFINE_ENUM_VALUED(DEBUG_CONTROL, Normal,   7, "F8   Normal speed (1x)");
+
+static ::llc::err_t debugControl(SApplication & app, DEBUG_CONTROL action) {
+	auto & gui = *app.Framework.GUI;
+	auto & game = app.GalaxyHellApp.Game;
+	switch(action) {
+	case DEBUG_CONTROL_Help:
+		gui.Controls.SetHidden(app.DebugHelp, !gui.Controls.IsHidden(app.DebugHelp));
+		if(!gui.Controls.IsHidden(app.DebugHelp)) gui.Controls.SetHidden(app.DebugPanel, true);
+		break;
+	case DEBUG_CONTROL_Panel:
+		gui.Controls.SetHidden(app.DebugPanel, !gui.Controls.IsHidden(app.DebugPanel));
+		if(!gui.Controls.IsHidden(app.DebugPanel)) gui.Controls.SetHidden(app.DebugHelp, true);
+		break;
+	case DEBUG_CONTROL_HUD:
+		gui.Controls.SetHidden(app.DebugHUD, !gui.Controls.IsHidden(app.DebugHUD));
+		break;
+	case DEBUG_CONTROL_Renderer: return ::ghg::galaxyHellToggleRenderer(app.GalaxyHellApp);
+	case DEBUG_CONTROL_Pause: {
+		if(app.GalaxyHellApp.ActiveState != ::ghg::APP_STATE_Play) break;
+		::llc::lock_guard lock(game.LockUpdate);
+		game.PlayState.GlobalState.Paused = !game.PlayState.GlobalState.Paused;
+		break;
+	}
+	case DEBUG_CONTROL_Slower:
+	case DEBUG_CONTROL_Faster:
+	case DEBUG_CONTROL_Normal: {
+		::llc::lock_guard lock(game.LockUpdate);
+		game.CustomTimeScale = action == DEBUG_CONTROL_Normal ? 1
+			: ::llc::clamped(game.CustomTimeScale * (action == DEBUG_CONTROL_Slower ? .5 : 2), .25, 4.0);
+		break;
+	}
+	default: return -1;
+	}
+	return 0;
+}
+
+static ::llc::err_t updateDebugControls(SApplication & app) {
+	const ::llc::u0_t keys[] = {::llc::SYSTEM_KEY_F1, ::llc::SYSTEM_KEY_F2, ::llc::SYSTEM_KEY_F3, ::llc::SYSTEM_KEY_F4, 'P', ::llc::SYSTEM_KEY_F6, ::llc::SYSTEM_KEY_F7, ::llc::SYSTEM_KEY_F8};
+	auto & gui = *app.Framework.GUI;
+	const auto & input = *app.Framework.RootWindow.Input;
+	const bool visible = !gui.Controls.IsHidden(app.DebugPanel);
+	for(::llc::u2_t i = 0; i < app.DebugControls.size(); ++i)
+		if((input.KeyDown(keys[i]) && !input.KeyboardCurrent.KeyState[::llc::SYSTEM_KEY_Menu] && !input.KeyboardCurrent.KeyState[::llc::SYSTEM_KEY_Control])
+			|| (visible && gui.Controls.IsAction(app.DebugControls[i])))
+			llc_necs(::debugControl(app, (DEBUG_CONTROL)i));
+	return 0;
+}
+
+static ::llc::err_t setupDebugControls(SApplication & app) {
+	auto & gui = *app.Framework.GUI;
+	llc_necs(app.DebugPanel = ::llc::controlCreate(gui));
+	gui.Controls.Placement[app.DebugPanel].Area = {{12, 44}, {376, 250}};
+	gui.Controls.Placement[app.DebugPanel].Align = ::llc::ALIGN_TOP_LEFT;
+	llc_necs(app.DebugStatus = ::llc::controlCreateChild(gui, app.DebugPanel));
+	gui.Controls.Placement[app.DebugStatus].Area = {{8, 8}, {352, 24}};
+	gui.Controls.Text[app.DebugStatus].Align = ::llc::ALIGN_CENTER_LEFT;
+	gui.Controls.Draw[app.DebugStatus].NoBorder = gui.Controls.Draw[app.DebugStatus].NoClient = true;
+	gui.Controls.States[app.DebugStatus].Mask = gui.Controls.States[app.DebugHUD].Mask;
+	llc_necs(::llc::guiCreateControlList<DEBUG_CONTROL>(gui, app.DebugPanel, {352, 24}, {8, 36}, ::llc::ALIGN_TOP_LEFT, ::llc::ALIGN_CENTER_LEFT, app.DebugControls));
+	llc_necs(app.DebugHelp = ::llc::controlCreate(gui));
+	gui.Controls.Placement[app.DebugHelp].Area = {{12, 44}, {376, 310}};
+	gui.Controls.Placement[app.DebugHelp].Align = ::llc::ALIGN_TOP_LEFT;
+	const ::llc::vcst_t help[] = {
+		"GALAXY HELL / HELP", "F1   Close help", "F2   Controls", "F3   Show / hide HUD", "F4   Switch CPU / D3D11",
+		"P    Pause / resume during play", "F6 / F7   Slower / faster", "F8   Restore 1x speed", "F5 / F9   Save / load reserved",
+		"WASD / arrows   Move", "Shift / Ctrl   Turbo", "Escape   Menu / continue"
+	};
+	::llc::acid lines;
+	llc_necs(::llc::guiCreateControlList(gui, help, app.DebugHelp, {352, 24}, {8, 8}, ::llc::ALIGN_TOP_LEFT, ::llc::ALIGN_CENTER_LEFT, lines));
+	for(const auto id : lines) {
+		gui.Controls.Draw[id].NoBorder = gui.Controls.Draw[id].NoClient = true;
+		gui.Controls.States[id].Mask = gui.Controls.States[app.DebugHUD].Mask;
+	}
+	gui.Controls.SetHidden(app.DebugPanel, true);
+	gui.Controls.SetHidden(app.DebugHelp, true);
+	return 0;
+}
+
+static ::llc::err_t updateDebugHUD(SApplication & app) {
+	auto & framework = app.Framework;
+	if(framework.Timer.LastTimeMicroseconds)
+		app.DebugFrames.Frame(framework.Timer.LastTimeMicroseconds);
+	const auto & cache = app.GalaxyHellApp.Game.DrawCache;
+	const double milliseconds = 1000 * (app.DebugFrames.FramesPerSecond ? app.DebugFrames.AverageFrameTime : framework.Timer.LastTimeSeconds);
+	const int count = snprintf(app.DebugHUDText, sizeof(app.DebugHUDText), "%s | %3u FPS | %6.2f ms avg | %ux%u | F3", cache.UseGPU && cache.DrawShips ? "D3D11" : "CPU", app.DebugFrames.FramesPerSecond, milliseconds, (unsigned)framework.RootWindow.Size.x, (unsigned)framework.RootWindow.Size.y);
+	if_true_fe(count < 0 || (::llc::u2_t)count >= sizeof(app.DebugHUDText));
+	llc_necs(::llc::controlTextSet(*framework.GUI, app.DebugHUD, {app.DebugHUDText, (::llc::u2_t)count}));
+	// The view keeps the same storage when its text changes length or digits.
+	framework.GUI->Controls.SetUpdated(app.DebugHUD, false);
+	auto & gui = *framework.GUI;
+	if(!gui.Controls.IsHidden(app.DebugPanel)) {
+		const auto & game = app.GalaxyHellApp.Game;
+		const bool paused = game.PlayState.GlobalState.Paused;
+		const bool playing = app.GalaxyHellApp.ActiveState == ::ghg::APP_STATE_Play;
+		const auto length = ::llc::sprintf_s(app.DebugStatusText, "%s | %.2fx | %s", cache.UseGPU && cache.DrawShips ? "D3D11" : "CPU", game.CustomTimeScale, playing ? (paused ? "PAUSED" : "RUNNING") : "MENU");
+		llc_necs(length);
+		llc_necs(::llc::controlTextSet(gui, app.DebugStatus, {app.DebugStatusText, (::llc::u2_t)length}));
+		gui.Controls.SetUpdated(app.DebugStatus, false);
+		gui.Controls.SetSelected(app.DebugControls[DEBUG_CONTROL_HUD], !gui.Controls.IsHidden(app.DebugHUD));
+		gui.Controls.SetSelected(app.DebugControls[DEBUG_CONTROL_Renderer], cache.UseGPU && cache.DrawShips);
+		gui.Controls.SetSelected(app.DebugControls[DEBUG_CONTROL_Pause], paused);
+		gui.Controls.SetSelected(app.DebugControls[DEBUG_CONTROL_Normal], game.CustomTimeScale == 1);
+		gui.Controls.SetDisabled(app.DebugControls[DEBUG_CONTROL_Pause], !playing);
+		gui.Controls.SetDisabled(app.DebugControls[DEBUG_CONTROL_Slower], game.CustomTimeScale <= .25);
+		gui.Controls.SetDisabled(app.DebugControls[DEBUG_CONTROL_Faster], game.CustomTimeScale >= 4);
+	}
+	return 0;
+}
+
+static ::llc::error_t presentFrame(SApplication & app, const ::ghg::TRenderTarget & frame, bool drawGUI) {
+	auto & game = app.GalaxyHellApp;
+	::std::lock_guard lockUpdate(game.Game.LockUpdate);
 	::std::lock_guard lockRender(app.LockRender);
 	const ::llc::SWindow & window = app.Framework.RootWindow;
 	if(window.NoDraw || 0 == window.Size.x || 0 == window.Size.y || frame.Color.metrics() != window.Size.u2())
@@ -134,6 +308,8 @@ static ::llc::error_t presentFrame(SApplication & app, const ::ghg::SGalaxyHellF
 	if(d3d.GUIStuff.RenderTarget.metrics() != window.Size.u2())
 		llc_necs(d3d.SetWindowSize(window.Size));
 	memcpy(d3d.GUIStuff.RenderTarget.begin(), frame.Color.begin(), frame.Color.byte_count());
+	if(!drawGUI)
+		llc_necs(::llc::guiDraw(*app.Framework.GUI, d3d.GUIStuff.RenderTarget.View));
 	for(auto & pixel : d3d.GUIStuff.RenderTarget.Texels)
 		pixel.a = 255; // Only the upload copy is opaque; the completed CPU frame is unchanged.
 	auto & resources = *d3d.DeviceResources;
@@ -145,7 +321,14 @@ static ::llc::error_t presentFrame(SApplication & app, const ::ghg::SGalaxyHellF
 	const ::llc::rgbaf clear = {0, 0, 0, 1};
 	context->ClearRenderTargetView(target, &clear.r);
 	llc_necs(::llc::d3dGUIDraw(resources, d3d.GUIStuff));
-	llc_necs(::llc::d3dGUIDraw(resources, app.GUIMesh, frame.GUI, frame.Color.metrics()));
+	if(drawGUI) {
+		llc_necs(::llc::d3dGUIDraw(resources, d3d.GUIStuff, *game.DialogPerState[game.ActiveState].GUI, window.Size));
+		if(game.ActiveState != ::ghg::APP_STATE_Play)
+			llc_necs(::llc::d3dGUIDraw(resources, d3d.GUIStuff, *game.DialogDesktop.GUI, window.Size));
+		for(auto & player : game.UIPlay.PlayerUI)
+			llc_necs(::llc::d3dGUIDraw(resources, d3d.GUIStuff, game.ActiveState == ::ghg::APP_STATE_Play ? *player.DialogPlay.GUI : *player.DialogHome.GUI, window.Size));
+		llc_necs(::llc::d3dGUIDraw(resources, d3d.GUIStuff, *app.Framework.GUI, window.Size));
+	}
 	return resources.Present();
 }
 
@@ -197,8 +380,8 @@ static	::llc::error_t	processSystemEvent	(::SApplication & app, const ::llc::SEv
 	if(app.D3D) {
 		app.GalaxyHellApp.Game.DrawCache.DrawShips = {};
 		app.ShipLabel = {};
-		app.GUIMesh = {};
 		app.ShipTarget = {};
+		app.FragmentClip = {};
 		if(app.D3D->DeviceResources && app.D3D->DeviceResources->m_swapChain)
 			if_fail_e(app.D3D->Shutdown());
 		app.D3D = {};
@@ -337,6 +520,18 @@ bool ParseCommandLine( const sc_t *pchCmdLine, const sc_t **ppchServerAddress, c
 	llc_necs(app.D3D->CreateDeviceResources(*app.GalaxyHellApp.Game.ShipState.Engine.Scene->Graphics));
 	llc_necs(app.D3D->SetWindowSize(mainWindow.Size));
 	drawCache.DrawShips = [&app](const ::ghg::SGalaxyHell & game, ::ghg::SGalaxyHellDrawCache & cache, const ::llc::m4f2_t & matrixVP) { return ::drawShipsGPU(app, game, cache, matrixVP); };
+	::llc::SGUI & debugGUI = *framework.GUI;
+	llc_necs(app.DebugHUD = ::llc::controlCreate(debugGUI));
+	debugGUI.Controls.Placement[app.DebugHUD].Area = {{0, 8}, {520, 24}};
+	debugGUI.Controls.Placement[app.DebugHUD].Align = ::llc::ALIGN_TOP | ::llc::ALIGN_HCENTER;
+	debugGUI.Controls.Text[app.DebugHUD].Align = ::llc::ALIGN_CENTER;
+	debugGUI.Controls.Draw[app.DebugHUD].NoBorder = true;
+	debugGUI.Controls.Draw[app.DebugHUD].ColorMode = ::llc::GUI_COLOR_MODE_Flat;
+	debugGUI.ThemeDefault = ::llc::ASCII_COLOR_DARKGREY * 16 + ::llc::ASCII_COLOR_WHITE;
+	debugGUI.Controls.States[app.DebugHUD].Mask &= ~(::llc::GUI_CONTROL_FLAG_Hovered | ::llc::GUI_CONTROL_FLAG_Pressed | ::llc::GUI_CONTROL_FLAG_Selected | ::llc::GUI_CONTROL_FLAG_Focused | ::llc::GUI_CONTROL_FLAG_Action);
+	llc_necs(::setupDebugControls(app));
+	llc_necs(::updateDebugHUD(app));
+	llc_necs(::llc::guiUpdateMetrics(debugGUI, mainWindow.Size, false));
 
 	return 0;
 }
@@ -350,9 +545,12 @@ bool ParseCommandLine( const sc_t *pchCmdLine, const sc_t **ppchServerAddress, c
 
 	llc_necs(mainWindow.EventQueue.for_each([&app](const ::llc::pobj<::llc::SEventSystem> & sysEvent) { return ::processSystemEvent(app, *sysEvent); }));
 
+	// The queued frame was drawn before this update can change the renderer setting.
+	const bool frameUseGPU = app.GalaxyHellApp.Game.DrawCache.UseGPU && app.GalaxyHellApp.Game.DrawCache.DrawShips;
+	llc_necs(::updateDebugControls(app));
 	if_true_vi(::llc::APPLICATION_STATE_EXIT, 1 == ::ghg::galaxyHellUpdate(app.GalaxyHellApp, framework.FrameInfo.Seconds.LastFrame, mainWindow.Input, mainWindow.EventQueue));
 
-	::llc::pobj<::ghg::SGalaxyHellFrame> frame;
+	::llc::pobj<::ghg::TRenderTarget> frame;
 	{
 		::std::lock_guard			lockRTQueue	(app.GalaxyHellApp.RenderTargetLockQueue);
 		if(app.GalaxyHellApp.RenderTargetQueue.size()) {
@@ -367,7 +565,7 @@ bool ParseCommandLine( const sc_t *pchCmdLine, const sc_t **ppchServerAddress, c
 		}
 	}
 	if(frame) {
-		const ::llc::error_t result = ::presentFrame(app, *frame);
+		const ::llc::error_t result = ::presentFrame(app, *frame, frameUseGPU);
 		{
 			::std::lock_guard lockRTPool(app.GalaxyHellApp.RenderTargetLockPool);
 			llc_necs(app.GalaxyHellApp.RenderTargetPool.push_back(frame));
@@ -405,6 +603,7 @@ bool ParseCommandLine( const sc_t *pchCmdLine, const sc_t **ppchServerAddress, c
 	SteamAPI_RunCallbacks();
 #endif
 
+	llc_necs(::updateDebugHUD(app));
 	if_true_vi(::llc::APPLICATION_STATE_EXIT, ::llc::APPLICATION_STATE_EXIT == ::llc::updateFramework(app.Framework));
 
 	//for(uint32_t i = 0; i < 4; ++i) {
